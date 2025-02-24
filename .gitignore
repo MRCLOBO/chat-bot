@@ -1,0 +1,4 @@
+#IGNORA EL JSON 
+front_end/tsconfig.json
+#IGNORA LAS VARIABLES DE ENTORNO,por favor :,v
+.env
