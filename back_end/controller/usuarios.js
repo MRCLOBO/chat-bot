@@ -1,6 +1,6 @@
 //import { this.movieModel } from "../views/usuario.js";
 import { Op, where } from "sequelize";
-import { UsuarioSchema } from "../models/usuarios.js";
+import { UsuarioSchema, UsuarioModel } from "../models/usuarios.js";
 
 export class UsuarioController {
   constructor(usuarioModel, usuarioSchema) {
@@ -14,7 +14,11 @@ export class UsuarioController {
 
   create = async (req, res) => {
     try {
-      const nuevoUsuario = await this.usuarioSchema.create(req);
+      const nuevoUsuario = req.body;
+      nuevoUsuario.id_usuario = await this.obtenerUltimoID(
+        nuevoUsuario.id_negocio
+      );
+      await this.usuarioSchema.create(nuevoUsuario);
       return res
         .status(200)
         .json({ type: "success", message: "¡Usuario creado con exito!" });
@@ -45,7 +49,7 @@ export class UsuarioController {
 
   delete = async (req, res) => {
     try {
-      const usuario = await this.getUsuario(req);
+      const usuario = await this.getUsuario(req.body);
       await usuario.destroy();
       res.json({ mensaje: "Usuario eliminado correctamente" });
     } catch (error) {
@@ -57,11 +61,34 @@ export class UsuarioController {
   };
 
   update = async (req, res) => {
-    const usuario = await this.getUsuario(req);
-    const filtros = await this.limpiarCampos(req);
+    const usuario = await this.getUsuario(req.body);
+    const filtros = await this.limpiarCampos(req.body);
     await usuario.update(filtros);
   };
 
+  login = async (req, res) => {
+    const filtros = req.body;
+    const usuario = await this.usuarioSchema.findOne({
+      where: { nombre_usuario: filtros.nombre_usuario },
+    });
+    if (usuario) {
+      if (usuario.contrasena === filtros.contrasena) {
+        usuario.contrasena = null;
+        return res.status(200).json(usuario);
+      }
+      if (usuario.contrasena !== filtros.contrasena) {
+        return res.status(200).json({
+          type: "error",
+          message: `Contraseña incorrecta, intentelo de nuevo`,
+        });
+      }
+    } else {
+      return res.status(200).json({
+        type: "error",
+        message: `Nombre de usuario no registrado`,
+      });
+    }
+  };
   async limpiarCampos(filtros) {
     //Se elimina todo aquel campo que tenga como valor "null"
     const filtrosLimpios = Object.fromEntries(
@@ -76,10 +103,27 @@ export class UsuarioController {
       filtros.id_usuario,
       where(col("id_negocio"), Op.eq, filtros.id_negocio)
     );
-    if (!usuario)
-      return res
-        .status(404)
-        .json({ type: "error", message: "Usuario no encontrado" });
+    if (!usuario) return { type: "error", message: "Usuario no encontrado" };
     return usuario;
+  }
+  async obtenerUltimoID(id_negocio) {
+    try {
+      const ultimoRegistro = await UsuarioSchema.findOne({
+        order: [["id_usuario", "DESC"]],
+        where: {
+          id_negocio: id_negocio,
+        },
+      });
+      if (ultimoRegistro) {
+        return ultimoRegistro.id_usuario + 1;
+      } else {
+        return 1;
+      }
+    } catch (error) {
+      return {
+        type: "error",
+        message: "Error al recuperar el ultimo ID de la tabla",
+      };
+    }
   }
 }
