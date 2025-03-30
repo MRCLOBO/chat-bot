@@ -1,6 +1,4 @@
-//import { this.movieModel } from "../views/usuario.js";
 import { Op, where } from "sequelize";
-import { UsuarioSchema, UsuarioModel } from "../models/usuarios.js";
 
 export class UsuarioController {
   constructor(usuarioModel, usuarioSchema) {
@@ -42,7 +40,7 @@ export class UsuarioController {
     } catch (error) {
       res.status(500).json({
         type: "error",
-        message: `Error al consultar los usuarios por el siguiente error: ${error}   req: ${req.body}   filtros: ${filtros}`,
+        message: `Error al consultar los usuarios por el siguiente error: ${error}`,
       });
     }
   };
@@ -99,7 +97,7 @@ export class UsuarioController {
 
   async getUsuario(filtros) {
     // Se busca al usuario por su id y id_negocio por la primary key compuesta
-    const usuario = await UsuarioSchema.findByPk(
+    const usuario = await this.usuarioSchema.findByPk(
       filtros.id_usuario,
       where(col("id_negocio"), Op.eq, filtros.id_negocio)
     );
@@ -108,7 +106,7 @@ export class UsuarioController {
   }
   async obtenerUltimoID(id_negocio) {
     try {
-      const ultimoRegistro = await UsuarioSchema.findOne({
+      const ultimoRegistro = await this.usuarioSchema.findOne({
         order: [["id_usuario", "DESC"]],
         where: {
           id_negocio: id_negocio,

@@ -4,14 +4,51 @@ import { corsMiddleware } from "./middlewares/cors.js";
 import { conectarBD, sequelize } from "./config/database.js";
 import { createUsuariosrouter } from "./routes/usuarios.js";
 import { UsuarioModel, UsuarioSchema } from "./models/usuarios.js";
-import multer from "multer";
 import path from "path";
+import { createNegocioRouter } from "./routes/negocios.js";
+import { NegocioModel, NegocioSchema } from "./models/negocios.js";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const multer = require("multer");
 
 const PORT = process.env.API_PORT ?? 3006;
 const app = express();
 app.disable("x-powered-by");
-app.use(json()); // para transformar el body de la request de JSON a objeto
 app.use(corsMiddleware());
+// app.use(express.urlencoded({ extended: true })); // para procesar formularios
+
+// const storage = multer.diskStorage({
+//   destination: "uploads/",
+//   filename: (req, file, cb) => {
+//     cb(null, Date.now() + path.extname(file.originalname));
+//   },
+// });
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, "imagenes/");
+    },
+    filename: (req, file, cb) => {
+      const imagen = Date.now() + "-" + file.originalname;
+      req.body.nombre_imagen = imagen;
+      cb(null, imagen);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+const guardarArchivo = upload.single("imagen");
+
+app.post("/subir-imagen", guardarArchivo, (req, res) => {
+  return res.status(200).json({
+    type: "success",
+    message: "Imagen guardada en el servidor",
+    nombre_imagen: req.body.nombre_imagen,
+  });
+});
+
+app.use(json()); // para transformar el body de la request de JSON a objeto al hacer esto ya no se pueden procesar files
 
 //Conexion a la BD
 conectarBD();
@@ -32,18 +69,11 @@ app.use(
   express.static(path.join(process.env.URLBASE, "imagenes"))
 );
 
-const multerStorage = multer.diskStorage({
-  //Se renombran los archivos que se alzen
-  destination: "imagenes/",
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + "-" + file.originalname);
-  },
-});
-
-const multerUpload = multer({ multerStorage });
-
 //basicamente en esta parte redirigimos todas las consultas de cualquier metodo a "/usuarios" al archivo usuariosRouter que ya maneja todas las solicitudes
 app.use("/usuarios", createUsuariosrouter(UsuarioModel, UsuarioSchema));
+
+//redirigimos todos lo que vena de negocios
+app.use("/negocios", createNegocioRouter(NegocioModel, NegocioSchema));
 
 //Servidor escuchando la conexion
 app.listen(PORT, () => {

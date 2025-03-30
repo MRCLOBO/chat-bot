@@ -1,45 +1,53 @@
 import { Sequelize, DataTypes, Op, where } from "sequelize";
 import { sequelize } from "../config/database.js";
 
-export const UsuarioSchema = sequelize.define(
-  "Usuario",
+export const NegocioSchema = sequelize.define(
+  "Negocio",
   {
-    id_usuario: {
+    id_negocio: {
       type: DataTypes.INTEGER,
       primaryKey: true,
       autoIncrement: true,
     },
-    nombre_usuario: {
+    nombre_negocio: {
       type: DataTypes.STRING,
       allowNull: false,
       unique: true,
     },
-    id_negocio: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      primaryKey: true,
+    direccion: {
+      type: DataTypes.STRING,
+      allowNull: true,
     },
-    nombre_negocio: {
+    email: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: false,
     },
-    rol: {
-      type: DataTypes.ENUM("admin", "propietario", "usuario"),
-      allowNull: false,
-      unique: false,
-      defaultValue: "usuario",
+    api_key: {
+      type: DataTypes.STRING,
+      allowNull: true,
     },
-    contrasena: {
+    propietario: {
       type: DataTypes.STRING,
       allowNull: false,
+    },
+    logo_negocio: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    tipo_negocio: {
+      type: DataTypes.ENUM("servicios", "productos", "ambos"),
+      allowNull: false,
       unique: false,
+    },
+    telefono: {
+      type: DataTypes.STRING,
+      allowNull: true,
     },
   },
   {
-    tableName: "usuarios",
+    tableName: "negocio",
     timestamps: false,
   }
 );
 
-export class UsuarioModel {}
+export class NegocioModel {}
