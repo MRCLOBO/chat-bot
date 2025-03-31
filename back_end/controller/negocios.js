@@ -59,13 +59,12 @@ export class NegocioController {
 
   update = async (req, res) => {
     const negocio = await this.getNegocio(req.body);
-    console.log("----prueba 1-------", negocio);
     const filtros = await this.limpiarCampos(req.body);
-    console.log("----filtros: -------", filtros);
-    delete filtros.id_entidad;
-    await this.negocioSchema.update(negocio.id_negocio, {
-      where: { id_negocio: filtros.id_negocio },
+    delete filtros.id_negocio;
+    const resultado = await this.negocioSchema.update(filtros, {
+      where: { id_negocio: negocio.id_negocio },
     });
+    return res.json({ type: "success", message: "Usuario modificado" });
   };
 
   async limpiarCampos(filtros) {
