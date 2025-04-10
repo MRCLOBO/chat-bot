@@ -75,6 +75,56 @@ app.use("/usuarios", createUsuariosrouter(UsuarioModel, UsuarioSchema));
 //redirigimos todos lo que vena de negocios
 app.use("/negocios", createNegocioRouter(NegocioModel, NegocioSchema));
 
+//PRUEBA DE DIALOGFLOW
+const dialogflow = require("@google-cloud/dialogflow");
+require("dotenv").config();
+
+//CREDENCIALES DE HELPI
+const CREDENTIALS = JSON.parse(process.env.DF_HELPI_KEY);
+
+const PROJECTID = CREDENTIALS.project_id;
+
+const CONFIGURATION = {
+  credentials: {
+    private_key: CREDENTIALS["private_key"],
+    client_email: CREDENTIALS["client_email"],
+  },
+};
+
+//SE CREA UNA NUEVA SESION
+const sessionClient = new dialogflow.SessionsClient(CONFIGURATION);
+
+//DETECTAR INTENT METHOD
+const detectIntent = async (languageCode, queryText, sessionId) => {
+  let sessionPath = sessionClient.projectAgentSessionPath(PROJECTID, sessionId);
+
+  //EL TEXTO DEL QUERY REQUEST
+  let request = {
+    session: sessionPath,
+    queryInput: {
+      text: {
+        //EL QUERY A MANDAR AL AGENTE DE DIALOGFLOW
+        text: queryText,
+        //EL LENGUAJE UTILIZADO POR EL CLIENTE es
+        languageCode: languageCode,
+      },
+    },
+  };
+
+  //ENVIAR UNA RESPUESTA Y ESPERAR UN LOG RESULT
+  const responses = await sessionClient.detectIntent(request);
+  console.log(" RESPUESTAS DEL BOT :", responses);
+  const result = responses[0].queryResult;
+  console.log(" RESULTADO :", result);
+
+  return {
+    response: result.fulfillmentText,
+  };
+};
+
+detectIntent("es", "hola", "abcd1234");
+//PRUEBA DE DIALOGFLOW
+
 //Servidor escuchando la conexion
 app.listen(PORT, () => {
   console.log(
