@@ -73,4 +73,29 @@ export class AtencionClienteController {
       });
     }
   };
+
+  webhook = async (req, res) => {
+    try {
+      console.log(
+        "###  PREGUNTA PROVENIENTE DE CHATBOT ####",
+        req.body,
+        "###############################"
+      );
+      res.send({
+        fulfillmentText:
+          "Hola este es un mensaje que proviene del backend, ¿No me crees? una respuesta generica diria esto... Chimichangas!",
+      });
+    } catch (error) {
+      console.log(
+        "###Ocurrio un error al responder la consulta del chatbot###",
+        error,
+        "################################"
+      );
+      return res.json({
+        type: "error",
+        message:
+          "Ocurrio un error en el servidor, por favor intentelo de nuevo mas tarde",
+      });
+    }
+  };
 }

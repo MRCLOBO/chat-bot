@@ -9,5 +9,7 @@ export const createAtencionClienteRouter = () => {
 
   atencionClienteRouter.post("/consulta", atencionClienteController.consulta);
 
+  atencionClienteRouter.post("/webhook", atencionClienteController.webhook);
+
   return atencionClienteRouter;
 };
