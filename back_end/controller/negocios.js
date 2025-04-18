@@ -64,7 +64,7 @@ export class NegocioController {
     const resultado = await this.negocioSchema.update(filtros, {
       where: { id_negocio: negocio.id_negocio },
     });
-    return res.json({ type: "success", message: "Usuario modificado" });
+    return res.json({ type: "success", message: "Negocio modificado" });
   };
 
   async limpiarCampos(filtros) {
