@@ -1,9 +1,11 @@
 import { Op, where } from "sequelize";
+import { NegocioSchema } from "../models/negocios.js";
 
 export class UsuarioController {
   constructor(usuarioModel, usuarioSchema) {
     this.usuarioModel = usuarioModel;
     this.usuarioSchema = usuarioSchema;
+    this.NegocioSchema = new NegocioSchema();
   }
   getAll = async (req, res) => {
     const usuarios = await this.usuarioSchema.findAll();
@@ -13,13 +15,24 @@ export class UsuarioController {
   create = async (req, res) => {
     try {
       const nuevoUsuario = req.body;
-      nuevoUsuario.id_usuario = await this.obtenerUltimoID(
+      nuevoUsuario["id_usuario"] = await this.obtenerUltimoID(
         nuevoUsuario.id_negocio
       );
-      await this.usuarioSchema.create(nuevoUsuario);
-      return res
-        .status(200)
-        .json({ type: "success", message: "¡Usuario creado con exito!" });
+      if (await this.existeApodo(nuevoUsuario.apodo)) {
+        return res.status(200).json({
+          type: "error",
+          message: "Este apodo no se encuentra disponible",
+        });
+      }
+      const negocioVinculado = await this.getNegocio(nuevoUsuario.id_negocio);
+      nuevoUsuario["nombre_negocio"] =
+        negocioVinculado.dataValues.nombre_negocio;
+      const respuestaBD = await this.usuarioSchema.create(nuevoUsuario);
+      return res.status(200).json({
+        type: "success",
+        message: "¡Usuario creado con exito!",
+        bd: respuestaBD,
+      });
     } catch (error) {
       res.status(500).json({
         type: "error",
@@ -61,7 +74,11 @@ export class UsuarioController {
   update = async (req, res) => {
     const usuario = await this.getUsuario(req.body);
     const filtros = await this.limpiarCampos(req.body);
-    await usuario.update(filtros);
+    delete filtros.id_usuario;
+    const resultado = await this.usuarioSchema.update(filtros, {
+      where: { id_negocio: usuario.id_negocio, id_usuario: usuario.id_usuario },
+    });
+    return res.json({ type: "success", message: "Usuario modificado" });
   };
 
   login = async (req, res) => {
@@ -96,13 +113,17 @@ export class UsuarioController {
   }
 
   async getUsuario(filtros) {
-    // Se busca al usuario por su id y id_negocio por la primary key compuesta
-    const usuario = await this.usuarioSchema.findByPk(
-      filtros.id_usuario,
-      where(col("id_negocio"), Op.eq, filtros.id_negocio)
-    );
-    if (!usuario) return { type: "error", message: "Usuario no encontrado" };
-    return usuario;
+    try {
+      // Se busca al usuario por su id y id_negocio por la primary key compuesta
+      const usuario = await this.usuarioSchema.findByPk(filtros.id_usuario);
+      if (!usuario) return { type: "error", message: "Usuario no encontrado" };
+      return usuario;
+    } catch (error) {
+      return res.status(200).json({
+        type: "error",
+        message: `Usuario no encontrado`,
+      });
+    }
   }
   async obtenerUltimoID(id_negocio) {
     try {
@@ -121,6 +142,38 @@ export class UsuarioController {
       return {
         type: "error",
         message: "Error al recuperar el ultimo ID de la tabla",
+      };
+    }
+  }
+  async getNegocio(idNegocio) {
+    try {
+      const negocio = await NegocioSchema.findByPk(idNegocio);
+      if (!negocio) return { type: "error", message: "Negocio no encontrado" };
+      return negocio;
+    } catch (error) {
+      return {
+        type: "error",
+        message: "Error al recuperar la informacion del negocio",
+        error: error,
+      };
+    }
+  }
+  async existeApodo(apodo) {
+    try {
+      const usuario = await this.usuarioSchema.findOne({
+        where: {
+          apodo: apodo,
+        },
+      });
+      if (usuario) {
+        return true;
+      } else {
+        return false;
+      }
+    } catch (error) {
+      return {
+        type: "error",
+        message: "Error al consultar si ya existe apodo",
       };
     }
   }

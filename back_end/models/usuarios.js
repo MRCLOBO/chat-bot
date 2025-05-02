@@ -12,7 +12,6 @@ export const UsuarioSchema = sequelize.define(
     nombre_usuario: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true,
     },
     id_negocio: {
       type: DataTypes.INTEGER,
@@ -35,9 +34,18 @@ export const UsuarioSchema = sequelize.define(
       allowNull: false,
       unique: false,
     },
+    apodo: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      unique: true,
+    },
+    foto_perfil: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
   },
   {
-    tableName: "usuarios",
+    tableName: "usuario",
     timestamps: false,
   }
 );
