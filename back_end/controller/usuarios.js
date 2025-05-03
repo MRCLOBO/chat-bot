@@ -42,18 +42,37 @@ export class UsuarioController {
   };
   getBy = async (req, res) => {
     try {
-      // Filtrar las claves con valores null
       const filtros = await this.limpiarCampos(req.body);
-      const usuarios = await this.usuarioSchema.findAll({
-        where: {
-          [Op.and]: filtros,
-        },
-      });
+      const condiciones = [];
+      // Filtro LIKE para 'apodo'
+      if (filtros.apodo) {
+        condiciones.push({
+          apodo: { [Op.like]: `%${filtros.apodo}%` },
+        });
+        delete filtros.apodo;
+      }
+      // Extraer los valores de ordenamiento y eliminarlos del objeto de filtros
+      const campoOrden = filtros.orden;
+      const tipoOrden = filtros.tipo_orden;
+      delete filtros.orden;
+      delete filtros.tipo_orden;
+      // Resto de filtros exactos
+      for (const key in filtros) {
+        condiciones.push({ [key]: filtros[key] });
+      }
+      // Armar la consulta con ordenamiento si aplica
+      const opcionesConsulta = {
+        where: { [Op.and]: condiciones },
+      };
+      if (campoOrden && tipoOrden) {
+        opcionesConsulta.order = [[campoOrden, tipoOrden]];
+      }
+      const usuarios = await this.usuarioSchema.findAll(opcionesConsulta);
       return res.status(200).json(usuarios);
     } catch (error) {
       res.status(500).json({
         type: "error",
-        message: `Error al consultar los usuarios por el siguiente error: ${error}`,
+        message: `Error al consultar los usuarios: ${error}`,
       });
     }
   };
