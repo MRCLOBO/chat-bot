@@ -11,6 +11,8 @@ import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const multer = require("multer");
 import { createAtencionClienteRouter } from "./routes/atencion-cliente.js";
+import { createHorarioRouter } from "./routes/horario.js";
+import { HorarioSchema, HorarioModel } from "./models/horario.js";
 
 const PORT = process.env.API_PORT ?? 3006;
 const app = express();
@@ -78,6 +80,9 @@ app.use("/negocios", createNegocioRouter(NegocioModel, NegocioSchema));
 
 //redireccion para todas las consultas hechas a la IA
 app.use("/atencion-cliente", createAtencionClienteRouter());
+
+//redireccion para todas las consultas con respecto al horario de los negocios
+app.use("/horario", createHorarioRouter(HorarioModel, HorarioSchema));
 
 //Servidor escuchando la conexion
 app.listen(PORT, () => {
