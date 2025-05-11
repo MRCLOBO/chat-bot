@@ -8,7 +8,6 @@ export class HorarioController {
   create = async (req, res) => {
     try {
       const nuevoHorario = req.body;
-      console.log(nuevoHorario);
       const respuestaBD = await this.horarioSchema.create(nuevoHorario);
       return res.status(200).json({
         type: "success",
