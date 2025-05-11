@@ -1,5 +1,4 @@
 import { Op, where } from "sequelize";
-
 export class HorarioController {
   constructor(horarioModel, horarioSchema) {
     this.horarioModel = horarioModel;
@@ -9,7 +8,8 @@ export class HorarioController {
   create = async (req, res) => {
     try {
       const nuevoHorario = req.body;
-      const respuestaBD = await this.negocioSchema.create(nuevoHorario);
+      console.log(nuevoHorario);
+      const respuestaBD = await this.horarioSchema.create(nuevoHorario);
       return res.status(200).json({
         type: "success",
         message: "¡Horario registrado!",

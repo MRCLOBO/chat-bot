@@ -17,7 +17,6 @@ export const HorarioSchema = sequelize.define(
     nombre_negocio: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true,
     },
     dia: {
       type: DataTypes.ENUM(
