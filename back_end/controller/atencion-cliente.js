@@ -2,6 +2,7 @@ import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const dialogflow = require("@google-cloud/dialogflow");
 require("dotenv").config();
+import { HorarioSchema } from "../models/horario.js";
 
 export class AtencionClienteController {
   //CREDENCIALES DE HELPI
@@ -76,6 +77,30 @@ export class AtencionClienteController {
 
   webhook = async (req, res) => {
     try {
+      const intencion = req.body.queryResult.intent.displayName;
+
+      if (intencion === "infoHorario") {
+        const id_negocio = req.body.queryResult.parameters.id_negocio || 1;
+
+        try {
+          const horarios = await HorarioSchema.findAll({
+            where: { id_negocio },
+          });
+
+          const respuestaHorario = this.construirMensajeHorarios(horarios);
+
+          return res.json({
+            fulfillmentText: respuestaHorario,
+          });
+        } catch (error) {
+          console.error("Error al consultar horarios:", error);
+          return res.json({
+            fulfillmentText:
+              "Ocurrió un error al consultar el horario. Intenta más tarde.",
+          });
+        }
+      }
+
       console.log(
         "###  PREGUNTA PROVENIENTE DE CHATBOT ####",
         req.body,
@@ -98,4 +123,30 @@ export class AtencionClienteController {
       });
     }
   };
+
+  construirMensajeHorarios(horarios) {
+    const ordenDias = [
+      "Lunes",
+      "Martes",
+      "Miercoles",
+      "Jueves",
+      "Viernes",
+      "Sábado",
+      "Domingo",
+    ];
+
+    const horariosOrdenados = horarios
+      .filter((h) => h.disponible)
+      .sort((a, b) => ordenDias.indexOf(a.dia) - ordenDias.indexOf(b.dia));
+
+    if (horariosOrdenados.length === 0) {
+      return "Actualmente no tenemos horarios disponibles.";
+    }
+
+    let mensaje = "🕒 Nuestro horario de atención es:\n";
+    for (const horario of horariosOrdenados) {
+      mensaje += `📅 ${horario.dia}: de ${horario.apertura} a ${horario.cierre}\n`;
+    }
+    return mensaje;
+  }
 }
