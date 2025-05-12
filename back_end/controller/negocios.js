@@ -1,4 +1,5 @@
 import { Op, where } from "sequelize";
+import { HorarioSchema } from "../models/horario.js";
 
 export class NegocioController {
   constructor(negocioModel, negocioSchema) {
@@ -47,6 +48,11 @@ export class NegocioController {
   delete = async (req, res) => {
     try {
       const negocio = await this.getNegocio(req.body);
+      await HorarioSchema.destroy({
+        where: {
+          id_negocio: negocio.id_negocio,
+        },
+      });
       await negocio.destroy();
       res.json({ mensaje: "Negocio eliminado correctamente" });
     } catch (error) {
