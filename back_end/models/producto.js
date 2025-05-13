@@ -1,15 +1,15 @@
 import { Sequelize, DataTypes, Op, where } from "sequelize";
 import { sequelize } from "../config/database.js";
 
-export const UsuarioSchema = sequelize.define(
-  "Usuario",
+export const ProductoSchema = sequelize.define(
+  "Producto",
   {
-    id_usuario: {
+    id_producto: {
       type: DataTypes.INTEGER,
       primaryKey: true,
       autoIncrement: true,
     },
-    nombre_usuario: {
+    nombre_producto: {
       type: DataTypes.STRING,
       allowNull: false,
     },
@@ -21,33 +21,32 @@ export const UsuarioSchema = sequelize.define(
     nombre_negocio: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: false,
     },
-    rol: {
-      type: DataTypes.ENUM("admin", "propietario", "usuario"),
-      allowNull: false,
-      unique: false,
-      defaultValue: "usuario",
+    cantidad: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
     },
-    contrasena: {
+    consultas: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+    precio: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+    categoria: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: false,
     },
-    apodo: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      unique: true,
-    },
-    foto_perfil: {
+    foto_producto: {
       type: DataTypes.STRING,
       allowNull: true,
     },
   },
   {
-    tableName: "usuario",
+    tableName: "producto",
     timestamps: false,
   }
 );
 
-export class UsuarioModel {}
+export class ProductoModel {}
