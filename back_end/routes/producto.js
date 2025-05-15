@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { ProductoController } from "../controller/usuarios.js";
+import { ProductoController } from "../controller/producto.js";
 
 //exportamos el router para la inyeccion de dependencia de modelo, para recibir por parametro el modelo
-export const createProductorouter = (ProductoModel, productoSchema) => {
+export const createProductoRouter = (ProductoModel, productoSchema) => {
   const productoRouter = Router();
 
   //instanciamos el movie controller ya que utiliza un constructor que pide

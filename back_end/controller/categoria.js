@@ -1,36 +1,36 @@
 import { Op, where } from "sequelize";
 import { NegocioSchema } from "../models/negocios.js";
 
-export class ProductoController {
-  constructor(productoModel, productoSchema) {
-    this.productoModel = productoModel;
-    this.productoSchema = productoSchema;
+export class CategoriaController {
+  constructor(categoriaModel, categoriaSchema) {
+    this.categoriaModel = categoriaModel;
+    this.categoriaSchema = categoriaSchema;
     this.NegocioSchema = new NegocioSchema();
   }
   getAll = async (req, res) => {
-    const producto = await this.productoSchema.findAll();
-    return res.status(200).json(producto);
+    const categoria = await this.categoriaSchema.findAll();
+    return res.status(200).json(categoria);
   };
 
   create = async (req, res) => {
     try {
-      const nuevoProducto = req.body;
-      nuevoProducto["id_producto"] = await this.obtenerUltimoID(
-        nuevoProducto.id_negocio
+      const nuevaCategoria = req.body;
+      nuevaCategoria["id_categoria"] = await this.obtenerUltimoID(
+        nuevaCategoria.id_negocio
       );
-      const negocioVinculado = await this.getNegocio(nuevoProducto.id_negocio);
-      nuevoProducto["nombre_negocio"] =
+      const negocioVinculado = await this.getNegocio(nuevaCategoria.id_negocio);
+      nuevaCategoria["nombre_negocio"] =
         negocioVinculado.dataValues.nombre_negocio;
-      const respuestaBD = await this.productoSchema.create(nuevoProducto);
+      const respuestaBD = await this.categoriaSchema.create(nuevaCategoria);
       return res.status(200).json({
         type: "success",
-        message: "Producto creado con exito!",
+        message: "Categoria creada con exito!",
         bd: respuestaBD,
       });
     } catch (error) {
       res.status(500).json({
         type: "error",
-        message: `Error al crear el producto por el siguiente error: ${error}`,
+        message: `Error al crear la categoria por el siguiente error: ${error}`,
       });
     }
   };
@@ -39,11 +39,11 @@ export class ProductoController {
       const filtros = await this.limpiarCampos(req.body);
       const condiciones = [];
       // Filtro LIKE para 'nombre'
-      if (filtros.nombre_producto) {
+      if (filtros.nombre_categoria) {
         condiciones.push({
-          nombre_producto: { [Op.like]: `%${filtros.nombre_producto}%` },
+          nombre_categoria: { [Op.like]: `%${filtros.nombre_categoria}%` },
         });
-        delete filtros.nombre_producto;
+        delete filtros.nombre_categoria;
       }
       // Extraer los valores de ordenamiento y eliminarlos del objeto de filtros
       const campoOrden = filtros.orden;
@@ -61,40 +61,40 @@ export class ProductoController {
       if (campoOrden && tipoOrden) {
         opcionesConsulta.order = [[campoOrden, tipoOrden]];
       }
-      const productos = await this.productoSchema.findAll(opcionesConsulta);
-      return res.status(200).json(productos);
+      const categorias = await this.categoriaSchema.findAll(opcionesConsulta);
+      return res.status(200).json(categorias);
     } catch (error) {
       res.status(500).json({
         type: "error",
-        message: `Error al consultar los productos: ${error}`,
+        message: `Error al consultar las categorias: ${error}`,
       });
     }
   };
 
   delete = async (req, res) => {
     try {
-      const producto = await this.getProducto(req.body);
-      await producto.destroy();
-      res.json({ mensaje: "Producto eliminado correctamente" });
+      const categoria = await this.getCategoria(req.body);
+      await categoria.destroy();
+      res.json({ mensaje: "Categoria eliminada correctamente" });
     } catch (error) {
       res.status(500).json({
         type: "error",
-        message: `Error al eliminar al producto por el siguiente error: ${error}`,
+        message: `Error al eliminar la categoria por el siguiente error: ${error}`,
       });
     }
   };
 
   update = async (req, res) => {
-    const producto = await this.getProducto(req.body);
+    const categoria = await this.getCategoria(req.body);
     const filtros = await this.limpiarCampos(req.body);
-    delete filtros.id_producto;
-    const resultado = await this.productoSchema.update(filtros, {
+    delete filtros.id_categoria;
+    const resultado = await this.categoriaSchema.update(filtros, {
       where: {
-        id_negocio: producto.id_negocio,
-        id_producto: producto.id_producto,
+        id_negocio: categoria.id_negocio,
+        id_categoria: categoria.id_categoria,
       },
     });
-    return res.json({ type: "success", message: "Producto modificado" });
+    return res.json({ type: "success", message: "Categoria modificada" });
   };
 
   async limpiarCampos(filtros) {
@@ -105,30 +105,32 @@ export class ProductoController {
     return filtrosLimpios;
   }
 
-  async getProducto(filtros) {
+  async getCategoria(filtros) {
     try {
-      // Se busca al producto por su id y id_negocio por la primary key compuesta
-      const producto = await this.productoSchema.findByPk(filtros.id_producto);
-      if (!producto)
-        return { type: "error", message: "Producto no encontrado" };
-      return producto;
+      // Se busca la categoria por su id y id_negocio por la primary key compuesta
+      const categoria = await this.categoriaSchema.findByPk(
+        filtros.id_categoria
+      );
+      if (!categoria)
+        return { type: "error", message: "Categoria no encontrada" };
+      return categoria;
     } catch (error) {
       return res.status(200).json({
         type: "error",
-        message: `Producto no encontrado`,
+        message: `Categoria no encontrada`,
       });
     }
   }
   async obtenerUltimoID(id_negocio) {
     try {
-      const ultimoRegistro = await this.productoSchema.findOne({
-        order: [["id_producto", "DESC"]],
+      const ultimoRegistro = await this.categoriaSchema.findOne({
+        order: [["id_categoria", "DESC"]],
         where: {
           id_negocio: id_negocio,
         },
       });
       if (ultimoRegistro) {
-        return ultimoRegistro.id_producto + 1;
+        return ultimoRegistro.id_categoria + 1;
       } else {
         return 1;
       }
@@ -154,13 +156,13 @@ export class ProductoController {
   }
   async existeNombre(nombre, id_negocio) {
     try {
-      const producto = await this.productoSchema.findOne({
+      const categoria = await this.categoriaSchema.findOne({
         where: {
-          nombre_producto: nombre,
+          nombre_categoria: nombre,
           id_negocio: id_negocio,
         },
       });
-      if (producto) {
+      if (categoria) {
         return true;
       } else {
         return false;

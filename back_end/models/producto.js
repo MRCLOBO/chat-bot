@@ -42,6 +42,10 @@ export const ProductoSchema = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
+    caracteristicas: {
+      type: DataTypes.TEXT,
+      defaultValue: "",
+    },
   },
   {
     tableName: "producto",

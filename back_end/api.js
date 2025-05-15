@@ -13,6 +13,10 @@ const multer = require("multer");
 import { createAtencionClienteRouter } from "./routes/atencion-cliente.js";
 import { createHorarioRouter } from "./routes/horario.js";
 import { HorarioSchema, HorarioModel } from "./models/horario.js";
+import { ProductoSchema, ProductoModel } from "./models/producto.js";
+import { createProductoRouter } from "./routes/producto.js";
+import { createCategoriaRouter } from "./routes/categoria.js";
+import { CategoriaModel, CategoriaSchema } from "./models/categoria.js";
 
 const PORT = process.env.API_PORT ?? 3006;
 const app = express();
@@ -83,6 +87,12 @@ app.use("/atencion-cliente", createAtencionClienteRouter());
 
 //redireccion para todas las consultas con respecto al horario de los negocios
 app.use("/horario", createHorarioRouter(HorarioModel, HorarioSchema));
+
+//redireccion para todas las consuluta de los productos
+app.use("/producto", createProductoRouter(ProductoModel, ProductoSchema));
+
+//consultas con respecto a las categorias de productos
+app.use("/categoria", createCategoriaRouter(CategoriaModel, CategoriaSchema));
 
 //Servidor escuchando la conexion
 app.listen(PORT, () => {
