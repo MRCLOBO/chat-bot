@@ -134,7 +134,12 @@ export class UsuarioController {
   async getUsuario(filtros) {
     try {
       // Se busca al usuario por su id y id_negocio por la primary key compuesta
-      const usuario = await this.usuarioSchema.findByPk(filtros.id_usuario);
+      const usuario = await this.usuarioSchema.findOne({
+        where: {
+          id_negocio: filtros.id_negocio,
+          id_usuario: filtros.id_usuario,
+        },
+      });
       if (!usuario) return { type: "error", message: "Usuario no encontrado" };
       return usuario;
     } catch (error) {

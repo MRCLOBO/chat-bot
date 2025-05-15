@@ -108,7 +108,12 @@ export class ProductoController {
   async getProducto(filtros) {
     try {
       // Se busca al producto por su id y id_negocio por la primary key compuesta
-      const producto = await this.productoSchema.findByPk(filtros.id_producto);
+      const producto = await this.productoSchema.findOne({
+        where: {
+          id_negocio: filtros.id_negocio,
+          id_producto: filtros.id_producto,
+        },
+      });
       if (!producto)
         return { type: "error", message: "Producto no encontrado" };
       return producto;

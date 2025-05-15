@@ -34,7 +34,11 @@ export const ProductoSchema = sequelize.define(
       type: DataTypes.INTEGER,
       defaultValue: 0,
     },
-    categoria: {
+    id_categoria: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
+    nombre_categoria: {
       type: DataTypes.STRING,
       allowNull: false,
     },
