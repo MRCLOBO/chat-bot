@@ -103,7 +103,7 @@ export class UsuarioController {
   login = async (req, res) => {
     const filtros = req.body;
     const usuario = await this.usuarioSchema.findOne({
-      where: { nombre_usuario: filtros.nombre_usuario },
+      where: { apodo: filtros.apodo },
     });
     if (usuario) {
       if (usuario.contrasena === filtros.contrasena) {
@@ -119,7 +119,7 @@ export class UsuarioController {
     } else {
       return res.status(200).json({
         type: "error",
-        message: `Nombre de usuario no registrado`,
+        message: `Apodo de usuario no registrado`,
       });
     }
   };
