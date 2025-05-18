@@ -20,5 +20,7 @@ export const createProductoRouter = (ProductoModel, productoSchema) => {
 
   productoRouter.post("/update", productoController.update);
 
+  productoRouter.post("/mas-consultados", productoController.masConsultado);
+
   return productoRouter;
 };

@@ -18,9 +18,6 @@ export class ProductoController {
       nuevoProducto["id_producto"] = await this.obtenerUltimoID(
         nuevoProducto.id_negocio
       );
-      const negocioVinculado = await this.getNegocio(nuevoProducto.id_negocio);
-      nuevoProducto["nombre_negocio"] =
-        negocioVinculado.dataValues.nombre_negocio;
       const respuestaBD = await this.productoSchema.create(nuevoProducto);
       return res.status(200).json({
         type: "success",
@@ -97,6 +94,24 @@ export class ProductoController {
     return res.json({ type: "success", message: "Producto modificado" });
   };
 
+  masConsultado = async (req, res) => {
+    try {
+      const filtros = req.body;
+      const opcionesConsulta = {
+        where: { [Op.and]: filtros },
+        order: [["consultas", "DESC"]],
+        limit: 5,
+      };
+      const productos = await this.productoSchema.findAll(opcionesConsulta);
+      return res.status(200).json(productos);
+    } catch (error) {
+      res.status(500).json({
+        type: "error",
+        message: `Error al consultar los productos: ${error}`,
+      });
+    }
+  };
+
   async limpiarCampos(filtros) {
     //Se elimina todo aquel campo que tenga como valor "null"
     const filtrosLimpios = Object.fromEntries(
@@ -118,10 +133,10 @@ export class ProductoController {
         return { type: "error", message: "Producto no encontrado" };
       return producto;
     } catch (error) {
-      return res.status(200).json({
+      return {
         type: "error",
         message: `Producto no encontrado`,
-      });
+      };
     }
   }
   async obtenerUltimoID(id_negocio) {
