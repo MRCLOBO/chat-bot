@@ -115,11 +115,6 @@ export class AtencionClienteController {
           break;
         case "consultarDisponibilidadProducto":
           const nombreProducto = req.body.queryResult.parameters["producto"];
-          console.log(
-            "######### PARAMETROS ###### ",
-            req.body.queryResult.parameters
-          );
-          console.log("######### PRODUCTO CONSULTADO ###### ", nombreProducto);
           try {
             const producto = await ProductoSchema.findOne({
               where: { nombre_producto: { [Op.iLike]: `%${nombreProducto}%` } },
@@ -132,11 +127,14 @@ export class AtencionClienteController {
             } else if (producto.cantidad > 5) {
               const precio = this.formatearGs(producto.precio);
               respuesta = `Sí, el producto "${producto.nombre_producto}" está disponible con un costo de ${precio}.`;
+              await producto.increment("consultas", { by: 1 });
             } else if (producto.cantidad > 0) {
               const precio = this.formatearGs(producto.precio);
               respuesta = `Sí, nos quedan solo ${producto.cantidad} unidades de "${producto.nombre_producto}" este cuenta con un precio de ${precio}.`;
+              await producto.increment("consultas", { by: 1 });
             } else {
               respuesta = `Lo siento, pero actualmente no tenemos disponibilidad de "${producto.nombre_producto}".`;
+              await producto.increment("consultas", { by: 1 });
             }
 
             return res.json({
