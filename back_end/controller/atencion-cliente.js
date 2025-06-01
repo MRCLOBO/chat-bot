@@ -115,7 +115,11 @@ export class AtencionClienteController {
           break;
         case "consultarDisponibilidadProducto":
           const nombreProducto = req.body.queryResult.parameters["producto"];
-
+          console.log(
+            "######### PARAMETROS ###### ",
+            req.body.queryResult.parameters
+          );
+          console.log("######### PRODUCTO CONSULTADO ###### ", nombreProducto);
           try {
             const producto = await ProductoSchema.findOne({
               where: { nombre_producto: { [Op.iLike]: `%${nombreProducto}%` } },
@@ -199,6 +203,7 @@ export class AtencionClienteController {
   }
   buscarDisponibilidadProducto = async (nombre, id_negocio) => {
     try {
+      console.log("#####NOMBRE DEL PRODUCTO CONSULTADO##### ", nombre);
       const productos = await ProductoSchema.findAll({
         where: {
           nombre_producto: {
@@ -252,10 +257,8 @@ export class AtencionClienteController {
 
     const client = await auth.getClient();
     const accessToken = await client.getAccessToken();
-
     const projectId = process.env.DF_PROYECT_ID;
     const entityTypeName = "producto";
-
     const sessionEntity = {
       name: `projects/${projectId}/agent/sessions/${sessionId}/entityTypes/${entityTypeName}`,
       entityOverrideMode: "ENTITY_OVERRIDE_MODE_OVERRIDE",
@@ -265,12 +268,12 @@ export class AtencionClienteController {
       })),
     };
 
-    await axios.put(
+    await axios.post(
       `https://dialogflow.googleapis.com/v2/projects/${projectId}/agent/sessions/${sessionId}/entityTypes`,
       sessionEntity,
       {
         headers: {
-          Authorization: `Bearer ${accessToken}`,
+          Authorization: `Bearer ${accessToken.token}`,
           "Content-Type": "application/json",
         },
       }
