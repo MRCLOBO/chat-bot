@@ -24,7 +24,12 @@ export class AtencionClienteController {
      sessionClient = new dialogflow.SessionsClient(this.CONFIGURATION);
 
      //DETECTAR INTENT METHOD
-     detectIntent = async (languageCode, queryText, sessionId) => {
+     detectIntent = async (
+          languageCode,
+          queryText,
+          sessionId,
+          infoAsistente
+     ) => {
           let sessionPath = this.sessionClient.projectAgentSessionPath(
                this.PROJECTID,
                sessionId
@@ -41,6 +46,22 @@ export class AtencionClienteController {
                          languageCode: languageCode,
                     },
                },
+               queryParams: {
+                    payload: {
+                         fields: {
+                              infoAsistente: {
+                                   structValue: {
+                                        fields: {
+                                             id_negocio: {
+                                                  numberValue:
+                                                       infoAsistente.id_negocio,
+                                             },
+                                        },
+                                   },
+                              },
+                         },
+                    },
+               },
           };
 
           //ENVIAR UNA RESPUESTA Y ESPERAR UN LOG RESULT
@@ -54,12 +75,12 @@ export class AtencionClienteController {
 
      consulta = async (req, res) => {
           try {
-               const { sessionID, consultaUsuario, infoNegocio } = req.body;
+               const { sessionID, consultaUsuario, infoAsistente } = req.body;
                //Se realiza una consulta a los productos del negocio para poder realizar un entitie de estos
                const productos = await ProductoSchema.findAll({
                     attributes: ['nombre_producto'],
                     where: {
-                         id_negocio: infoNegocio.id_negocio, // asegurate de que esta variable tenga el valor correcto
+                         id_negocio: infoAsistente.id_negocio, // asegurate de que esta variable tenga el valor correcto
                     },
                });
                const productosNombres = productos.map((p) => p.nombre_producto);
@@ -67,7 +88,8 @@ export class AtencionClienteController {
                const respuestaBOT = await this.detectIntent(
                     'es',
                     consultaUsuario,
-                    sessionID
+                    sessionID,
+                    infoAsistente
                );
 
                return res.json({
@@ -90,9 +112,10 @@ export class AtencionClienteController {
 
      webhook = async (req, res) => {
           try {
+               const infoAsistente =
+                    req.body.originalDetectIntentRequest.payload?.infoAsistente;
+               const id_negocio = infoAsistente?.id_negocio;
                const intencion = req.body.queryResult.intent.displayName;
-               const id_negocio =
-                    req.body.queryResult.parameters.id_negocio || 1;
                switch (intencion) {
                     case 'infoHorario':
                          try {
@@ -129,13 +152,21 @@ export class AtencionClienteController {
 
                          try {
                               const productos = await ProductoSchema.findAll({
-                                   where: where(
-                                        fn('LOWER', col('nombre_producto')),
-                                        {
-                                             [Op.like]: `%${nombreProductoLower}%`,
-                                        }
-                                   ),
-                                   limit: 5, // por si hay muchos resultados, limitamos a 5
+                                   where: {
+                                        [Op.and]: [
+                                             where(
+                                                  fn(
+                                                       'LOWER',
+                                                       col('nombre_producto')
+                                                  ),
+                                                  {
+                                                       [Op.like]: `%${nombreProductoLower}%`,
+                                                  }
+                                             ),
+                                             { id_negocio: id_negocio },
+                                        ],
+                                   },
+                                   limit: 5,
                               });
 
                               let respuesta;

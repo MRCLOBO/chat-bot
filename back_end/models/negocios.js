@@ -1,5 +1,6 @@
 import { Sequelize, DataTypes, Op, where } from 'sequelize';
 import { sequelize } from '../config/database.js';
+import { AsistenteSchema } from './asistente.js';
 
 export const NegocioSchema = sequelize.define(
      'Negocio',
@@ -45,5 +46,4 @@ export const NegocioSchema = sequelize.define(
           timestamps: false,
      }
 );
-
 export class NegocioModel {}
