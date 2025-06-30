@@ -8,6 +8,8 @@ import { NegocioSchema } from '../models/negocios.js';
 const { GoogleAuth } = require('google-auth-library');
 const axios = require('axios');
 import { Sequelize, DataTypes, Op, where, fn, col } from 'sequelize';
+import { PreguntaAsistenteSchema } from '../models/preguntas-asistente.js';
+import { RespuestaAsistenteSchema } from '../models/respuesta-asistente.js';
 
 export class AtencionClienteController {
      //CREDENCIALES DE HELPI
@@ -116,6 +118,9 @@ export class AtencionClienteController {
                     req.body.originalDetectIntentRequest.payload?.infoAsistente;
                const id_negocio = infoAsistente?.id_negocio;
                const intencion = req.body.queryResult.intent.displayName;
+               const pregunta = await PreguntaAsistenteSchema.findOne({
+                    where: { intencion: intencion },
+               });
                switch (intencion) {
                     case 'infoHorario':
                          try {
@@ -214,14 +219,43 @@ export class AtencionClienteController {
                          break;
                     case 'infoJefe':
                          try {
-                              const valorParametro =
-                                   req.body.queryResult.parameters.jefeInfo;
                               const negocio = await NegocioSchema.findOne({
                                    where: { id_negocio },
                               });
+
+                              if (!negocio) {
+                                   return res.json({
+                                        fulfillmentText:
+                                             'No se encontró información del negocio.',
+                                   });
+                              }
+
+                              if (!pregunta) {
+                                   return res.json({
+                                        fulfillmentText:
+                                             'Lo siento, no entendi muy bien tu consulta. Me lo podrias especificar, por favor.',
+                                   });
+                              }
+                              const respuestaDB =
+                                   await RespuestaAsistenteSchema.findOne({
+                                        where: {
+                                             id_negocio,
+                                             id_pregunta: pregunta.id_pregunta,
+                                        },
+                                   });
                               let respuesta = '';
-                              if (valorParametro) {
-                                   respuesta = `Quien se encuentra a cargo del negocio es ${negocio.propietario}. Si quieres puedes escribirle un mensaje en el siguiente correo "${negocio.email}"`;
+                              if (respuestaDB?.respuesta) {
+                                   const datosNegocio = {
+                                        propietario: negocio.propietario,
+                                        correo: negocio.email,
+                                        nombre: negocio.nombre_negocio,
+                                        // podés agregar más campos aquí si los usás en las plantillas
+                                   };
+                                   respuesta = this.renderTemplate(
+                                        respuestaDB.respuesta,
+                                        datosNegocio
+                                   );
+                                   // respuesta = `Quien se encuentra a cargo del negocio es ${negocio.propietario}. Si quieres puedes escribirle un mensaje en el siguiente correo "${negocio.email}"`;
                               } else {
                                    respuesta = `Disculpa, no entendi muy bien tu consulta ¿Podrias ser mas especifico?`;
                               }
@@ -231,7 +265,7 @@ export class AtencionClienteController {
                               });
                          } catch (error) {
                               console.error(
-                                   `ERROR al consultar sobre infoJefe, valor de infoJefe: ${valorParametro}:`,
+                                   `ERROR al consultar sobre infoJefe`,
                                    error
                               );
                               return res.json({
@@ -427,5 +461,10 @@ export class AtencionClienteController {
                     },
                }
           );
+     }
+     renderTemplate(template, datos) {
+          return template.replace(/\{\s*(\w+)\s*\}/g, (_, key) => {
+               return datos[key] || `{${key}}`;
+          });
      }
 }

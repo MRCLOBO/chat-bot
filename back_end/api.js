@@ -19,6 +19,16 @@ import { createCategoriaRouter } from './routes/categoria.js';
 import { CategoriaModel, CategoriaSchema } from './models/categoria.js';
 import { AsistenteModel, AsistenteSchema } from './models/asistente.js';
 import { createAsistenteRouter } from './routes/asistente.js';
+import {
+     RespuestaAsistenteModel,
+     RespuestaAsistenteSchema,
+} from './models/respuesta-asistente.js';
+import { createRespuestaAsistenteRouter } from './routes/respuesta-asistente.js';
+import {
+     PreguntaAsistenteModel,
+     PreguntaAsistenteSchema,
+} from './models/preguntas-asistente.js';
+import { createPreguntaAsistenteRouter } from './routes/pregunta-asistente.js';
 
 import './models/relaciones-tablas.js';
 
@@ -26,14 +36,6 @@ const PORT = process.env.API_PORT ?? 3006;
 const app = express();
 app.disable('x-powered-by');
 app.use(corsMiddleware());
-// app.use(express.urlencoded({ extended: true })); // para procesar formularios
-
-// const storage = multer.diskStorage({
-//   destination: "uploads/",
-//   filename: (req, file, cb) => {
-//     cb(null, Date.now() + path.extname(file.originalname));
-//   },
-// });
 
 const upload = multer({
      storage: multer.diskStorage({
@@ -100,6 +102,24 @@ app.use('/categoria', createCategoriaRouter(CategoriaModel, CategoriaSchema));
 
 //consultas con respecto a las categorias de productos
 app.use('/asistente', createAsistenteRouter(AsistenteModel, AsistenteSchema));
+
+//consultas con respecto a las respuestas del asistente
+app.use(
+     '/respuesta-asistente',
+     createRespuestaAsistenteRouter(
+          RespuestaAsistenteModel,
+          RespuestaAsistenteSchema
+     )
+);
+
+//consultas con respecto a las preguntas del asistente
+app.use(
+     '/pregunta-asistente',
+     createPreguntaAsistenteRouter(
+          PreguntaAsistenteModel,
+          PreguntaAsistenteSchema
+     )
+);
 
 //Servidor escuchando la conexion
 app.listen(PORT, () => {
