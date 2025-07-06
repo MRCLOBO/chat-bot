@@ -118,231 +118,278 @@ export class AtencionClienteController {
                     req.body.originalDetectIntentRequest.payload?.infoAsistente;
                const id_negocio = infoAsistente?.id_negocio;
                const intencion = req.body.queryResult.intent.displayName;
-               const pregunta = await PreguntaAsistenteSchema.findOne({
-                    where: { intencion: intencion },
+               let respuesta = '';
+               const negocio = await NegocioSchema.findOne({
+                    where: { id_negocio },
                });
-               switch (intencion) {
-                    case 'infoHorario':
-                         try {
-                              const horarios = await HorarioSchema.findAll({
-                                   where: { id_negocio },
-                              });
 
-                              const respuestaHorario =
-                                   this.construirMensajeHorarios(horarios);
+               if (!negocio) {
+                    return res.json({
+                         fulfillmentText:
+                              'No se encontró información del negocio.',
+                    });
+               }
+               /**
+                * Si mi intencion no es la generica buscara la respuesta en base a este, sino, lo buscara por pregunta ya que es un intento personalizado
+                */
+               try {
+                    if (intencion !== 'Default Fallback Intent') {
+                         const pregunta = await PreguntaAsistenteSchema.findOne(
+                              {
+                                   where: { intencion: intencion },
+                              }
+                         );
 
-                              return res.json({
-                                   fulfillmentText: respuestaHorario,
-                              });
-                         } catch (error) {
-                              console.error(
-                                   'Error al consultar horarios:',
-                                   error
-                              );
+                         if (!pregunta) {
                               return res.json({
                                    fulfillmentText:
-                                        'Ocurrió un error al consultar el horario. Intenta más tarde.',
+                                        'Lo siento, no entendi muy bien tu consulta. Me lo podrias especificar, por favor.',
                               });
                          }
-                         break;
-                    case 'consultarDisponibilidadProducto':
-                         const nombreProductoRaw =
-                              req.body.queryResult.parameters['producto'];
-                         const nombreProducto = Array.isArray(nombreProductoRaw)
-                              ? nombreProductoRaw[0]
-                              : nombreProductoRaw;
-
-                         const nombreProductoLower =
-                              String(nombreProducto).toLowerCase();
-
-                         try {
-                              const productos = await ProductoSchema.findAll({
+                         const respuestaDB =
+                              await RespuestaAsistenteSchema.findOne({
                                    where: {
-                                        [Op.and]: [
-                                             where(
-                                                  fn(
-                                                       'LOWER',
-                                                       col('nombre_producto')
-                                                  ),
-                                                  {
-                                                       [Op.like]: `%${nombreProductoLower}%`,
-                                                  }
-                                             ),
-                                             { id_negocio: id_negocio },
-                                        ],
+                                        id_negocio,
+                                        id_pregunta: pregunta.id_pregunta,
                                    },
-                                   limit: 5,
                               });
-
-                              let respuesta;
-
-                              if (productos.length === 0) {
-                                   respuesta = `Lo siento, no tenemos el producto "${nombreProducto}".`;
-                              } else if (productos.length === 1) {
-                                   const producto = productos[0];
-
-                                   if (producto.cantidad > 5) {
-                                        const precio = this.formatearGs(
-                                             producto.precio
-                                        );
-                                        respuesta = `Sí, el producto "${producto.nombre_producto}" está disponible con un costo de ${precio}.`;
-                                   } else if (producto.cantidad > 0) {
-                                        const precio = this.formatearGs(
-                                             producto.precio
-                                        );
-                                        respuesta = `Sí, nos quedan solo ${producto.cantidad} unidades de "${producto.nombre_producto}" este cuenta con un precio de ${precio}.`;
-                                   } else {
-                                        respuesta = `Lo siento, pero actualmente no tenemos disponibilidad de "${producto.nombre_producto}".`;
-                                   }
-
-                                   await producto.increment('consultas', {
-                                        by: 1,
-                                   });
-                              } else {
-                                   // Más de un producto coincide
-                                   const nombresEjemplo = productos
-                                        .map((p) => `"${p.nombre_producto}"`)
-                                        .join(', ');
-                                   respuesta = `Tenemos varios articulos que coinciden con "${nombreProducto}". ¿Podrías especificar mejor cuál buscás? Algunos de ellos son: ${nombresEjemplo}.`;
-                              }
-
-                              return res.json({
-                                   fulfillmentText: respuesta,
-                              });
-                         } catch (error) {
-                              console.error(error);
-                              return res.json({
-                                   fulfillmentText:
-                                        'Ocurrió un error al consultar la disponibilidad. Por favor, intente nuevamente.',
-                              });
-                         }
-                         break;
-                    case 'infoJefe':
-                         try {
-                              const negocio = await NegocioSchema.findOne({
-                                   where: { id_negocio },
-                              });
-
-                              if (!negocio) {
-                                   return res.json({
-                                        fulfillmentText:
-                                             'No se encontró información del negocio.',
-                                   });
-                              }
-
-                              if (!pregunta) {
-                                   return res.json({
-                                        fulfillmentText:
-                                             'Lo siento, no entendi muy bien tu consulta. Me lo podrias especificar, por favor.',
-                                   });
-                              }
-                              const respuestaDB =
-                                   await RespuestaAsistenteSchema.findOne({
-                                        where: {
-                                             id_negocio,
-                                             id_pregunta: pregunta.id_pregunta,
-                                        },
-                                   });
-                              let respuesta = '';
-                              if (respuestaDB?.respuesta) {
-                                   const datosNegocio = {
-                                        propietario: negocio.propietario,
-                                        correo: negocio.email,
-                                        nombre: negocio.nombre_negocio,
-                                        // podés agregar más campos aquí si los usás en las plantillas
-                                   };
-                                   respuesta = this.renderTemplate(
-                                        respuestaDB.respuesta,
-                                        datosNegocio
-                                   );
-                                   // respuesta = `Quien se encuentra a cargo del negocio es ${negocio.propietario}. Si quieres puedes escribirle un mensaje en el siguiente correo "${negocio.email}"`;
-                              } else {
-                                   respuesta = `Disculpa, no entendi muy bien tu consulta ¿Podrias ser mas especifico?`;
-                              }
-
-                              return res.json({
-                                   fulfillmentText: respuesta,
-                              });
-                         } catch (error) {
-                              console.error(
-                                   `ERROR al consultar sobre infoJefe`,
-                                   error
+                         if (respuestaDB?.respuesta) {
+                              const datosNegocio = {
+                                   negocio: negocio,
+                              };
+                              respuesta = this.renderTemplate(
+                                   respuestaDB.respuesta,
+                                   datosNegocio
                               );
-                              return res.json({
-                                   fulfillmentText:
-                                        'Disculpe pero ocurrio un error interno del servidor al intentar responder su consulta. Por favor, intente de nuevo más tarde.',
-                              });
+                              // respuesta = `Quien se encuentra a cargo del negocio es ${negocio.propietario}. Si quieres puedes escribirle un mensaje en el siguiente correo "${negocio.email}"`;
+                         } else {
+                              respuesta = `Disculpa, no entendi muy bien tu consulta ¿Podrias ser mas especifico?`;
                          }
-                         break;
-                    case 'infoDireccion':
-                         try {
-                              const valorParametro =
-                                   req.body.queryResult.parameters.direccion;
-                              const negocio = await NegocioSchema.findOne({
-                                   where: { id_negocio },
+                    }
+                    if (intencion === 'Default Fallback Intent') {
+                         const preguntas =
+                              await PreguntaAsistenteSchema.findAll({
+                                   where: { id_negocio: id_negocio },
                               });
-                              let respuesta = '';
-                              if (valorParametro) {
-                                   respuesta = `El negocio se encuentra en la direccion: ${negocio.direccion}, si llegas a tener problemas en encontrarnos puedes contactarnos por el siguiente numero ${negocio.telefono}`;
-                              } else {
-                                   respuesta = `Disculpa, no entendi muy bien tu consulta ¿Podrias ser mas especifico?`;
-                              }
+                         // Paso 2: Capturás el texto ingresado por el usuario
+                         const textoUsuario = req.body.queryResult.queryText
+                              .toLowerCase()
+                              .trim();
 
-                              return res.json({
-                                   fulfillmentText: respuesta,
-                              });
-                         } catch (error) {
-                              console.error(
-                                   `ERROR al consultar sobre infoDireccion, valor de infoDireccion: ${valorParametro}:`,
-                                   error
-                              );
-                              return res.json({
-                                   fulfillmentText:
-                                        'Disculpe pero ocurrio un error interno del servidor al intentar responder su consulta. Por favor, intente de nuevo más tarde.',
-                              });
-                         }
-                         break;
-                    case 'infoContacto':
-                         try {
-                              const valorParametro =
-                                   req.body.queryResult.parameters.infoContacto;
-                              const negocio = await NegocioSchema.findOne({
-                                   where: { id_negocio },
-                              });
-                              let respuesta = '';
-                              if (valorParametro) {
-                                   respuesta = `El negocio cuenta con el siguiente numero: ${negocio.telefono}, y con el correo: '${negocio.email}' por si necesitas algun otro tipo de asistencia en la cuál no te pueda ayudar`;
-                              } else {
-                                   respuesta = `Disculpa, no entendi muy bien tu consulta ¿Podrias ser mas especifico?`;
-                              }
+                         // Paso 3: Buscás una coincidencia aproximada
+                         const preguntaMatch = preguntas.find((p) => {
+                              const preguntaPrincipal = (
+                                   p.pregunta || ''
+                              ).toLowerCase();
+                              const sinonimos =
+                                   p.sinonimos?.map((s) => s.toLowerCase()) ||
+                                   [];
 
-                              return res.json({
-                                   fulfillmentText: respuesta,
-                              });
-                         } catch (error) {
-                              console.error(
-                                   `ERROR al consultar sobre infoContacto, valor de infoContacto: ${valorParametro}:`,
-                                   error
+                              return (
+                                   textoUsuario.includes(preguntaPrincipal) ||
+                                   sinonimos.some((sin) =>
+                                        textoUsuario.includes(sin)
+                                   )
                               );
-                              return res.json({
-                                   fulfillmentText:
-                                        'Disculpe pero ocurrio un error interno del servidor al intentar responder su consulta. Por favor, intente de nuevo más tarde.',
-                              });
+                         });
+
+                         // Paso 4: Si encontrás coincidencia, respondés
+                         if (preguntaMatch) {
+                              const datosNegocio = {
+                                   negocio: negocio,
+                              };
+                              const respuestaBD = preguntaMatch.respuesta; // o cargás desde RespuestaAsistenteSchema si estás personalizando por negocio
+                              respuesta = this.renderTemplate(
+                                   respuestaBD,
+                                   datosNegocio
+                              );
+                         } else {
+                              respuesta = `Disculpa, no entendi muy bien tu consulta ¿Podrias ser mas especifico?`;
                          }
-                         break;
-                    default:
-                         break;
+                    }
+
+                    return res.json({
+                         fulfillmentText: respuesta,
+                    });
+               } catch (error) {
+                    console.error(
+                         `OCURRIO UN ERROR EN LA CONSULTA DEL CHATBOT`,
+                         error
+                    );
+                    return res.json({
+                         fulfillmentText:
+                              'Disculpe pero ocurrio un error interno del servidor al intentar responder su consulta. Por favor, intente de nuevo más tarde.',
+                    });
                }
 
-               console.log(
-                    '###  PREGUNTA PROVENIENTE DE CHATBOT ####',
-                    req.body,
-                    '###############################'
-               );
-               res.send({
-                    fulfillmentText:
-                         'Hola este es un mensaje que proviene del backend, ¿No me crees? una respuesta generica diria esto... Chimichangas!',
-               });
+               // switch (intencion) {
+               //      case 'infoHorario':
+               //           try {
+               //                const horarios = await HorarioSchema.findAll({
+               //                     where: { id_negocio },
+               //                });
+
+               //                const respuestaHorario =
+               //                     this.construirMensajeHorarios(horarios);
+
+               //                return res.json({
+               //                     fulfillmentText: respuestaHorario,
+               //                });
+               //           } catch (error) {
+               //                console.error(
+               //                     'Error al consultar horarios:',
+               //                     error
+               //                );
+               //                return res.json({
+               //                     fulfillmentText:
+               //                          'Ocurrió un error al consultar el horario. Intenta más tarde.',
+               //                });
+               //           }
+               //           break;
+               //      case 'consultarDisponibilidadProducto':
+               //           const nombreProductoRaw =
+               //                req.body.queryResult.parameters['producto'];
+               //           const nombreProducto = Array.isArray(nombreProductoRaw)
+               //                ? nombreProductoRaw[0]
+               //                : nombreProductoRaw;
+
+               //           const nombreProductoLower =
+               //                String(nombreProducto).toLowerCase();
+
+               //           try {
+               //                const productos = await ProductoSchema.findAll({
+               //                     where: {
+               //                          [Op.and]: [
+               //                               where(
+               //                                    fn(
+               //                                         'LOWER',
+               //                                         col('nombre_producto')
+               //                                    ),
+               //                                    {
+               //                                         [Op.like]: `%${nombreProductoLower}%`,
+               //                                    }
+               //                               ),
+               //                               { id_negocio: id_negocio },
+               //                          ],
+               //                     },
+               //                     limit: 5,
+               //                });
+
+               //                let respuesta;
+
+               //                if (productos.length === 0) {
+               //                     respuesta = `Lo siento, no tenemos el producto "${nombreProducto}".`;
+               //                } else if (productos.length === 1) {
+               //                     const producto = productos[0];
+
+               //                     if (producto.cantidad > 5) {
+               //                          const precio = this.formatearGs(
+               //                               producto.precio
+               //                          );
+               //                          respuesta = `Sí, el producto "${producto.nombre_producto}" está disponible con un costo de ${precio}.`;
+               //                     } else if (producto.cantidad > 0) {
+               //                          const precio = this.formatearGs(
+               //                               producto.precio
+               //                          );
+               //                          respuesta = `Sí, nos quedan solo ${producto.cantidad} unidades de "${producto.nombre_producto}" este cuenta con un precio de ${precio}.`;
+               //                     } else {
+               //                          respuesta = `Lo siento, pero actualmente no tenemos disponibilidad de "${producto.nombre_producto}".`;
+               //                     }
+
+               //                     await producto.increment('consultas', {
+               //                          by: 1,
+               //                     });
+               //                } else {
+               //                     // Más de un producto coincide
+               //                     const nombresEjemplo = productos
+               //                          .map((p) => `"${p.nombre_producto}"`)
+               //                          .join(', ');
+               //                     respuesta = `Tenemos varios articulos que coinciden con "${nombreProducto}". ¿Podrías especificar mejor cuál buscás? Algunos de ellos son: ${nombresEjemplo}.`;
+               //                }
+
+               //                return res.json({
+               //                     fulfillmentText: respuesta,
+               //                });
+               //           } catch (error) {
+               //                console.error(error);
+               //                return res.json({
+               //                     fulfillmentText:
+               //                          'Ocurrió un error al consultar la disponibilidad. Por favor, intente nuevamente.',
+               //                });
+               //           }
+               //           break;
+               //      case 'infoJefe':
+
+               //           break;
+               //      case 'infoDireccion':
+               //           try {
+               //                const valorParametro =
+               //                     req.body.queryResult.parameters.direccion;
+               //                const negocio = await NegocioSchema.findOne({
+               //                     where: { id_negocio },
+               //                });
+               //                let respuesta = '';
+               //                if (valorParametro) {
+               //                     respuesta = `El negocio se encuentra en la direccion: ${negocio.direccion}, si llegas a tener problemas en encontrarnos puedes contactarnos por el siguiente numero ${negocio.telefono}`;
+               //                } else {
+               //                     respuesta = `Disculpa, no entendi muy bien tu consulta ¿Podrias ser mas especifico?`;
+               //                }
+
+               //                return res.json({
+               //                     fulfillmentText: respuesta,
+               //                });
+               //           } catch (error) {
+               //                console.error(
+               //                     `ERROR al consultar sobre infoDireccion, valor de infoDireccion: ${valorParametro}:`,
+               //                     error
+               //                );
+               //                return res.json({
+               //                     fulfillmentText:
+               //                          'Disculpe pero ocurrio un error interno del servidor al intentar responder su consulta. Por favor, intente de nuevo más tarde.',
+               //                });
+               //           }
+               //           break;
+               //      case 'infoContacto':
+               //           try {
+               //                const valorParametro =
+               //                     req.body.queryResult.parameters.infoContacto;
+               //                const negocio = await NegocioSchema.findOne({
+               //                     where: { id_negocio },
+               //                });
+               //                let respuesta = '';
+               //                if (valorParametro) {
+               //                     respuesta = `El negocio cuenta con el siguiente numero: ${negocio.telefono}, y con el correo: '${negocio.email}' por si necesitas algun otro tipo de asistencia en la cuál no te pueda ayudar`;
+               //                } else {
+               //                     respuesta = `Disculpa, no entendi muy bien tu consulta ¿Podrias ser mas especifico?`;
+               //                }
+
+               //                return res.json({
+               //                     fulfillmentText: respuesta,
+               //                });
+               //           } catch (error) {
+               //                console.error(
+               //                     `ERROR al consultar sobre infoContacto, valor de infoContacto: ${valorParametro}:`,
+               //                     error
+               //                );
+               //                return res.json({
+               //                     fulfillmentText:
+               //                          'Disculpe pero ocurrio un error interno del servidor al intentar responder su consulta. Por favor, intente de nuevo más tarde.',
+               //                });
+               //           }
+               //           break;
+               //      default:
+               //           break;
+               // }
+
+               // console.log(
+               //      '###  PREGUNTA PROVENIENTE DE CHATBOT ####',
+               //      req.body,
+               //      '###############################'
+               // );
+               // res.send({
+               //      fulfillmentText:
+               //           'Hola este es un mensaje que proviene del backend, ¿No me crees? una respuesta generica diria esto... Chimichangas!',
+               // });
           } catch (error) {
                console.log(
                     '###Ocurrio un error al responder la consulta del chatbot###',
@@ -463,8 +510,11 @@ export class AtencionClienteController {
           );
      }
      renderTemplate(template, datos) {
-          return template.replace(/\{\s*(\w+)\s*\}/g, (_, key) => {
-               return datos[key] || `{${key}}`;
+          return template.replace(/\{\s*([\w.]+)\s*\}/g, (_, path) => {
+               const value = path.split('.').reduce((obj, key) => {
+                    return obj?.[key];
+               }, datos);
+               return value !== undefined ? value : `{${path}}`; // si no encuentra, deja el placeholder
           });
      }
 }

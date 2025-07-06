@@ -20,7 +20,16 @@ export const PreguntaAsistenteSchema = sequelize.define(
           },
           intencion: {
                type: DataTypes.TEXT,
-               allowNull: false,
+               allowNull: true,
+          },
+          id_negocio: {
+               type: DataTypes.INTEGER,
+               allowNull: true,
+          },
+          sinonimos: {
+               type: DataTypes.ARRAY(DataTypes.TEXT), // ✅ array de strings
+               allowNull: true,
+               defaultValue: [],
           },
      },
      {

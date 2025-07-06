@@ -22,32 +22,59 @@ export class PreguntaAsistenteController {
                const respuestaBD = await this.preguntaAsistenteSchema.create(
                     nuevaPregunta
                );
-               /**
-                * Poner respuesta generica a cada negocio luego de la creacion de una pregunta
-                */
-               const negocios = await NegocioSchema.findAll({
-                    include: [{ model: AsistenteSchema, as: 'asistente' }],
-               });
-               const respuestasAsistente = negocios
-                    .filter((negocio) => negocio.asistente)
-                    .map((negocio) => {
-                         const asistente = negocio.asistente;
-
-                         return {
-                              id_asistente: asistente.id_asistente,
-                              nombre_asistente: asistente.nombre_asistente,
-                              id_negocio: negocio.id_negocio,
-                              nombre_negocio: negocio.nombre_negocio,
-                              respuesta: nuevaPregunta.respuesta,
-                              id_pregunta: nuevaPregunta.id_pregunta,
-                         };
+               if (
+                    nuevaPregunta.id_negocio &&
+                    nuevaPregunta.id_negocio !== null
+               ) {
+                    const negocio = await NegocioSchema.findOne({
+                         where: { id_negocio: nuevaPregunta.id_negocio },
+                         include: [{ model: AsistenteSchema, as: 'asistente' }],
                     });
-               await RespuestaAsistenteSchema.bulkCreate(respuestasAsistente);
-               return res.status(200).json({
-                    type: 'success',
-                    message: 'Pregunta de Asistente creada con exito!',
-                    bd: respuestaBD,
-               });
+                    const respuesta = {
+                         id_asistente: negocio.asistente.id_asistente,
+                         nombre_asistente: negocio.asistente.nombre_asistente,
+                         id_negocio: negocio.id_negocio,
+                         nombre_negocio: negocio.nombre_negocio,
+                         respuesta: nuevaPregunta.respuesta,
+                         id_pregunta: nuevaPregunta.id_pregunta,
+                    };
+                    await RespuestaAsistenteSchema.create(respuestasAsistente);
+                    return res.status(200).json({
+                         type: 'success',
+                         message: 'Pregunta de Asistente creada con exito!',
+                         bd: respuestaBD,
+                    });
+               }
+               if (nuevaPregunta.id_negocio === null) {
+                    /**
+                     * Poner respuesta generica a cada negocio luego de la creacion de una pregunta
+                     */
+                    const negocios = await NegocioSchema.findAll({
+                         include: [{ model: AsistenteSchema, as: 'asistente' }],
+                    });
+                    const respuestasAsistente = negocios
+                         .filter((negocio) => negocio.asistente)
+                         .map((negocio) => {
+                              const asistente = negocio.asistente;
+
+                              return {
+                                   id_asistente: asistente.id_asistente,
+                                   nombre_asistente: asistente.nombre_asistente,
+                                   id_negocio: negocio.id_negocio,
+                                   nombre_negocio: negocio.nombre_negocio,
+                                   respuesta: nuevaPregunta.respuesta,
+                                   id_pregunta: nuevaPregunta.id_pregunta,
+                              };
+                         });
+                    await RespuestaAsistenteSchema.bulkCreate(
+                         respuestasAsistente
+                    );
+                    return res.status(200).json({
+                         type: 'success',
+                         message: 'Pregunta de Asistente creada con exito!',
+                         bd: respuestaBD,
+                    });
+               }
           } catch (error) {
                res.status(500).json({
                     type: 'error',
@@ -75,6 +102,11 @@ export class PreguntaAsistenteController {
                delete filtros.orden;
                delete filtros.tipo_orden;
                // Resto de filtros exactos
+               let idNegocio = '';
+               if (filtros.id_negocio) {
+                    idNegocio = filtros.id_negocio;
+                    delete filtros.id_negocio;
+               }
                for (const key in filtros) {
                     condiciones.push({ [key]: filtros[key] });
                }
@@ -85,9 +117,20 @@ export class PreguntaAsistenteController {
                if (campoOrden && tipoOrden) {
                     opcionesConsulta.order = [[campoOrden, tipoOrden]];
                }
+
                const preguntasAsistente =
                     await this.preguntaAsistenteSchema.findAll({
                          ...opcionesConsulta,
+                         include: [
+                              {
+                                   model: RespuestaAsistenteSchema,
+                                   as: 'respuestas',
+                                   where: idNegocio
+                                        ? { id_negocio: idNegocio }
+                                        : undefined,
+                                   required: false,
+                              },
+                         ],
                     });
                return res.status(200).json(preguntasAsistente);
           } catch (error) {
@@ -161,10 +204,10 @@ export class PreguntaAsistenteController {
                     };
                return preguntaAsistente;
           } catch (error) {
-               return res.status(200).json({
+               return {
                     type: 'error',
                     message: `Pregunta de asistente no encontrado`,
-               });
+               };
           }
      }
      async obtenerUltimoID() {
