@@ -40,6 +40,10 @@ export const NegocioSchema = sequelize.define(
                type: DataTypes.STRING,
                allowNull: true,
           },
+          api_key: {
+               type: DataTypes.TEXT,
+               allowNull: false,
+          },
      },
      {
           tableName: 'negocio',

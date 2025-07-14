@@ -7,14 +7,6 @@ export class CategoriaController {
           this.categoriaModel = categoriaModel;
           this.categoriaSchema = categoriaSchema;
           this.NegocioSchema = new NegocioSchema();
-          this.categoriaSchema.hasMany(ProductoSchema, {
-               foreignKey: 'id_categoria',
-               as: 'producto',
-          });
-          ProductoSchema.belongsTo(this.categoriaSchema, {
-               foreignKey: 'id_categoria',
-               as: 'categoria',
-          });
      }
      getAll = async (req, res) => {
           const categoria = await this.categoriaSchema.findAll();

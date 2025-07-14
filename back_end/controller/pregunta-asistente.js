@@ -2,11 +2,14 @@ import { Op, where, fn, col } from 'sequelize';
 import { NegocioSchema } from '../models/negocios.js';
 import { AsistenteSchema } from '../models/asistente.js';
 import { RespuestaAsistenteSchema } from '../models/respuesta-asistente.js';
+import { VariablePreguntaSchema } from '../models/variable-pregunta.js';
+import { IntentsClient } from '@google-cloud/dialogflow'; // Asegurate de importar esto
 
 export class PreguntaAsistenteController {
      constructor(preguntaAsistenteModel, preguntaAsistenteSchema) {
           this.preguntaAsistenteModel = preguntaAsistenteModel;
           this.preguntaAsistenteSchema = preguntaAsistenteSchema;
+          this.variablePreguntaSchema = VariablePreguntaSchema;
      }
 
      getAll = async (req, res) => {
@@ -19,68 +22,87 @@ export class PreguntaAsistenteController {
           try {
                const nuevaPregunta = req.body;
                nuevaPregunta['id_pregunta'] = await this.obtenerUltimoID();
+
+               // 2. Extraer variables de la pregunta
+               const variables = this.extraerVariablesDeTexto(
+                    nuevaPregunta.pregunta
+               );
+
+               // 3. Buscar los valores de ejemplo de cada variable
+               const valoresEjemplo = {};
+               for (const nombreVariable of variables) {
+                    const variable = await this.variablePreguntaSchema.findOne({
+                         where: {
+                              nombre_variable_pregunta: nombreVariable,
+                              id_negocio: nuevaPregunta.id_negocio,
+                         },
+                    });
+
+                    // Asegurate de que tenga al menos un valor
+                    if (
+                         variable &&
+                         Array.isArray(variable.valores) &&
+                         variable.valores.length > 0
+                    ) {
+                         valoresEjemplo[nombreVariable] = variable.valores[0]; // ejemplo: "zapato azul"
+                    } else {
+                         valoresEjemplo[nombreVariable] = nombreVariable; // fallback
+                    }
+               }
+               // Obtener el project ID del negocio
+               const CREDENTIALS = await this.obtenerCredencialesDelNegocio(
+                    nuevaPregunta.id_negocio
+               );
+               const PROJECT_ID = CREDENTIALS.project_id;
+
+               // Generar contextsOut automáticamente desde la respuesta
+               const contextsOut = this.generarOutputContextsDesdeRespuesta(
+                    nuevaPregunta.respuesta,
+                    nuevaPregunta.intencion,
+                    PROJECT_ID
+               );
+
+               const trainingPhrases = [
+                    {
+                         parts: this.generarParts(
+                              nuevaPregunta.pregunta,
+                              valoresEjemplo
+                         ),
+                    },
+                    ...(nuevaPregunta.sinonimos || [])
+                         .filter(
+                              (s) =>
+                                   typeof s === 'string' && s.trim().length > 0
+                         )
+                         .map((s) => ({
+                              parts: this.generarParts(s, valoresEjemplo),
+                         })),
+               ];
+               // 5. Crear el intent en Dialogflow
+               await this.crearIntentDesdePregunta({
+                    displayName: nuevaPregunta.intencion,
+                    trainingPhrases: trainingPhrases,
+                    respuesta: nuevaPregunta.respuesta,
+                    contextsIn: nuevaPregunta.contexto_entrada || [],
+                    contextsOut: contextsOut,
+                    webhook: nuevaPregunta.webhook,
+                    id_negocio: nuevaPregunta.id_negocio,
+               });
                const respuestaBD = await this.preguntaAsistenteSchema.create(
                     nuevaPregunta
                );
-               if (
-                    nuevaPregunta.id_negocio &&
-                    nuevaPregunta.id_negocio !== null
-               ) {
-                    const negocio = await NegocioSchema.findOne({
-                         where: { id_negocio: nuevaPregunta.id_negocio },
-                         include: [{ model: AsistenteSchema, as: 'asistente' }],
-                    });
-                    const respuesta = {
-                         id_asistente: negocio.asistente.id_asistente,
-                         nombre_asistente: negocio.asistente.nombre_asistente,
-                         id_negocio: negocio.id_negocio,
-                         nombre_negocio: negocio.nombre_negocio,
-                         respuesta: nuevaPregunta.respuesta,
-                         id_pregunta: nuevaPregunta.id_pregunta,
-                    };
-                    await RespuestaAsistenteSchema.create(respuestasAsistente);
-                    return res.status(200).json({
-                         type: 'success',
-                         message: 'Pregunta de Asistente creada con exito!',
-                         bd: respuestaBD,
-                    });
-               }
-               if (nuevaPregunta.id_negocio === null) {
-                    /**
-                     * Poner respuesta generica a cada negocio luego de la creacion de una pregunta
-                     */
-                    const negocios = await NegocioSchema.findAll({
-                         include: [{ model: AsistenteSchema, as: 'asistente' }],
-                    });
-                    const respuestasAsistente = negocios
-                         .filter((negocio) => negocio.asistente)
-                         .map((negocio) => {
-                              const asistente = negocio.asistente;
 
-                              return {
-                                   id_asistente: asistente.id_asistente,
-                                   nombre_asistente: asistente.nombre_asistente,
-                                   id_negocio: negocio.id_negocio,
-                                   nombre_negocio: negocio.nombre_negocio,
-                                   respuesta: nuevaPregunta.respuesta,
-                                   id_pregunta: nuevaPregunta.id_pregunta,
-                              };
-                         });
-                    await RespuestaAsistenteSchema.bulkCreate(
-                         respuestasAsistente
-                    );
-                    return res.status(200).json({
-                         type: 'success',
-                         message: 'Pregunta de Asistente creada con exito!',
-                         bd: respuestaBD,
-                    });
-               }
-          } catch (error) {
-               res.status(500).json({
-                    type: 'error',
-                    message: `Error al crear la pregunta del asistente por el siguiente error: ${error}`,
+               return res.status(200).json({
+                    type: 'success',
+                    message: 'Pregunta de Asistente creada con éxito y sincronizada con Dialogflow.',
+                    bd: respuestaBD,
                });
-               console.error(error);
+          } catch (error) {
+               console.error('Error al crear la pregunta:', error);
+               return res.status(500).json({
+                    type: 'error',
+                    message: 'Ocurrió un error al crear la pregunta.',
+               });
           }
      };
      getBy = async (req, res) => {
@@ -145,19 +167,62 @@ export class PreguntaAsistenteController {
           try {
                const infoPreguntaAsistente = req.body;
                const preguntaAsistente = await this.getPreguntaAsistente(
-                    req.body
+                    infoPreguntaAsistente
                );
-               await RespuestaAsistenteSchema.destroy({
-                    where: {
-                         id_pregunta: infoPreguntaAsistente.id_pregunta,
+               const configAgente = await NegocioSchema.findOne({
+                    where: { id_negocio: infoPreguntaAsistente.id_negocio },
+               });
+
+               if (!configAgente || !configAgente.api_key) {
+                    throw new Error(
+                         'Credenciales de Dialogflow no encontradas'
+                    );
+               }
+
+               const CREDENTIALS = JSON.parse(configAgente.api_key);
+
+               const CONFIGURATION = {
+                    credentials: {
+                         private_key: CREDENTIALS['private_key'],
+                         client_email: CREDENTIALS['client_email'],
                     },
+               };
+
+               const client = new IntentsClient(CONFIGURATION);
+               const projectPath = client.projectAgentPath(
+                    CREDENTIALS.project_id
+               );
+
+               // Listar intents para encontrar el que queremos eliminar
+               const [intents] = await client.listIntents({
+                    parent: projectPath,
+               });
+               const intent = intents.find(
+                    (i) => i.displayName === preguntaAsistente.intencion
+               );
+
+               if (!intent) {
+                    return res.status(404).json({
+                         type: 'error',
+                         message: `Intent con nombre ${preguntaAsistente.intencion} no encontrado en Dialogflow.`,
+                    });
+               }
+
+               // Eliminar intent en Dialogflow
+               await client.deleteIntent({ name: intent.name });
+
+               // Eliminar datos en la base de datos
+               await RespuestaAsistenteSchema.destroy({
+                    where: { id_pregunta: infoPreguntaAsistente.id_pregunta },
                });
                await preguntaAsistente.destroy();
+
                res.json({
-                    mensaje: 'Pregunta de asistente eliminada correctamente',
+                    type: 'success',
+                    message: 'Pregunta de asistente e intent eliminados correctamente.',
                });
           } catch (error) {
-               console.error(error);
+               console.error('Error al eliminar la pregunta:', error);
                res.status(500).json({
                     type: 'error',
                     message: `Error al eliminar la pregunta del asistente por el siguiente error: ${error}`,
@@ -166,18 +231,96 @@ export class PreguntaAsistenteController {
      };
 
      update = async (req, res) => {
-          const preguntaAsistente = await this.getPreguntaAsistente(req.body);
-          const filtros = await this.limpiarCampos(req.body);
-          delete filtros.id_pregunta;
-          const resultado = await this.preguntaAsistenteSchema.update(filtros, {
-               where: {
-                    id_pregunta: preguntaAsistente.id_pregunta,
-               },
-          });
-          return res.json({
-               type: 'success',
-               message: 'Pregunta de asistente modificado',
-          });
+          try {
+               const nuevaPregunta = req.body;
+
+               // 1. Obtener la pregunta original desde la BD
+               const preguntaAsistente = await this.getPreguntaAsistente(
+                    req.body
+               );
+
+               // 2. Limpiar campos que no queremos actualizar directamente
+               const filtros = await this.limpiarCampos(req.body);
+               delete filtros.id_pregunta;
+
+               // 3. Extraer variables de la pregunta actualizada
+               const variables = this.extraerVariablesDeTexto(
+                    nuevaPregunta.pregunta
+               );
+
+               // 4. Buscar ejemplos para las variables
+               const valoresEjemplo = {};
+               for (const nombreVariable of variables) {
+                    const variable = await this.variablePreguntaSchema.findOne({
+                         where: {
+                              nombre_variable_pregunta: nombreVariable,
+                              id_negocio: nuevaPregunta.id_negocio,
+                         },
+                    });
+
+                    if (
+                         variable &&
+                         Array.isArray(variable.valores) &&
+                         variable.valores.length > 0
+                    ) {
+                         valoresEjemplo[nombreVariable] = variable.valores[0];
+                    } else {
+                         valoresEjemplo[nombreVariable] = nombreVariable;
+                    }
+               }
+
+               // 5. Obtener el project ID del negocio
+               const CREDENTIALS = await this.obtenerCredencialesDelNegocio(
+                    nuevaPregunta.id_negocio
+               );
+               const PROJECT_ID = CREDENTIALS.project_id;
+
+               // 6. Generar los contextos de salida desde la respuesta
+               const contextsOut = this.generarOutputContextsDesdeRespuesta(
+                    nuevaPregunta.respuesta,
+                    nuevaPregunta.intencion,
+                    PROJECT_ID
+               );
+
+               // 7. Generar las trainingParts
+               const sinonimosParts = (nuevaPregunta.sinonimos || [])
+                    .filter((s) => typeof s === 'string' && s.trim().length > 0)
+                    .map((s) => this.generarParts(s, valoresEjemplo));
+
+               const parts = [
+                    this.generarParts(nuevaPregunta.pregunta, valoresEjemplo),
+                    ...sinonimosParts,
+               ].flat();
+
+               // 8. Actualizar el intent en Dialogflow
+               await this.actualizarIntentDesdePregunta({
+                    displayName: nuevaPregunta.intencion,
+                    trainingParts: parts,
+                    respuesta: nuevaPregunta.respuesta,
+                    contextsIn: nuevaPregunta.contexto_entrada || [],
+                    contextsOut: contextsOut,
+                    webhook: nuevaPregunta.webhook,
+                    id_negocio: nuevaPregunta.id_negocio,
+               });
+
+               // 9. Actualizar la base de datos
+               await this.preguntaAsistenteSchema.update(filtros, {
+                    where: {
+                         id_pregunta: preguntaAsistente.id_pregunta,
+                    },
+               });
+
+               return res.json({
+                    type: 'success',
+                    message: 'Pregunta de asistente actualizada y sincronizada con Dialogflow.',
+               });
+          } catch (error) {
+               console.error('Error al actualizar la pregunta:', error);
+               return res.status(500).json({
+                    type: 'error',
+                    message: 'Ocurrió un error al actualizar la pregunta.',
+               });
+          }
      };
 
      async limpiarCampos(filtros) {
@@ -227,5 +370,207 @@ export class PreguntaAsistenteController {
                     message: 'Error al recuperar el ultimo ID de la tabla',
                };
           }
+     }
+     extraerVariablesDeTexto(texto) {
+          const regex = /{([^}]+)}/g;
+          const variables = [];
+          let match;
+          while ((match = regex.exec(texto)) !== null) {
+               variables.push(match[1].trim());
+          }
+          return variables;
+     }
+     generarParts(texto, valoresEjemplo) {
+          const regex = /{([^}]+)}/g; // Busca variables entre { }
+          let match;
+          const parts = [];
+          let lastIndex = 0;
+
+          while ((match = regex.exec(texto)) !== null) {
+               const varName = match[1].trim();
+               const start = match.index;
+
+               // Texto antes de la variable
+               if (start > lastIndex) {
+                    parts.push({
+                         text: texto.substring(lastIndex, start),
+                    });
+               }
+
+               const valorEjemplo = valoresEjemplo[varName] || varName;
+
+               // Parte con la entidad normal
+               parts.push({
+                    text: valorEjemplo,
+                    entityType: `@${varName}`,
+                    alias: varName,
+                    userDefined: true,
+               });
+
+               lastIndex = regex.lastIndex;
+          }
+
+          // Texto después de la última variable
+          if (lastIndex < texto.length) {
+               parts.push({
+                    text: texto.substring(lastIndex),
+               });
+          }
+
+          return parts;
+     }
+     // Función auxiliar para crear el intent
+     async crearIntentDesdePregunta({
+          displayName,
+          trainingPhrases,
+          respuesta,
+          contextsIn,
+          contextsOut,
+          webhook,
+          id_negocio,
+     }) {
+          const configAgente = await NegocioSchema.findOne({
+               where: { id_negocio },
+          });
+
+          if (!configAgente || !configAgente.api_key) {
+               throw new Error('Credenciales de Dialogflow no encontradas');
+          }
+
+          const CREDENTIALS = JSON.parse(configAgente.api_key);
+
+          const CONFIGURATION = {
+               credentials: {
+                    private_key: CREDENTIALS['private_key'],
+                    client_email: CREDENTIALS['client_email'],
+               },
+          };
+
+          const intentsClient = new IntentsClient(CONFIGURATION);
+          const projectPath = intentsClient.projectAgentPath(
+               CREDENTIALS.project_id
+          );
+
+          const request = {
+               parent: projectPath,
+               intent: {
+                    displayName: displayName,
+                    trainingPhrases: trainingPhrases,
+
+                    messages: [
+                         {
+                              text: {
+                                   text: [respuesta],
+                              },
+                         },
+                    ],
+                    inputContextNames: contextsIn.map(
+                         (ctx) =>
+                              `projects/${CREDENTIALS.project_id}/agent/sessions/-/contexts/${ctx}`
+                    ),
+                    outputContexts: contextsOut,
+                    webhookState: webhook
+                         ? 'WEBHOOK_STATE_ENABLED'
+                         : 'WEBHOOK_STATE_DISABLED',
+               },
+          };
+
+          await intentsClient.createIntent(request);
+     }
+
+     generarOutputContextsDesdeRespuesta(respuesta, projectId) {
+          const variables = this.extraerVariablesDeTexto(respuesta);
+
+          return variables.map((variable) => {
+               return {
+                    name: `projects/${projectId}/agent/sessions/-/contexts/${variable}`,
+                    lifespanCount: 5,
+                    parameters: {
+                         [variable]: '',
+                    },
+               };
+          });
+     }
+     async obtenerCredencialesDelNegocio(id_negocio) {
+          const negocio = await NegocioSchema.findOne({
+               where: { id_negocio },
+          });
+
+          if (!negocio || !negocio.api_key) {
+               throw new Error(
+                    'No se encontraron las credenciales del negocio.'
+               );
+          }
+
+          return JSON.parse(negocio.api_key);
+     }
+     async actualizarIntentDesdePregunta({
+          displayName,
+          trainingParts,
+          respuesta,
+          contextsIn = [],
+          contextsOut = [],
+          webhook,
+          id_negocio,
+     }) {
+          const configAgente = await NegocioSchema.findOne({
+               where: { id_negocio },
+          });
+
+          if (!configAgente || !configAgente.api_key) {
+               throw new Error('Credenciales de Dialogflow no encontradas');
+          }
+
+          const CREDENTIALS = JSON.parse(configAgente.api_key);
+
+          const CONFIGURATION = {
+               credentials: {
+                    private_key: CREDENTIALS['private_key'],
+                    client_email: CREDENTIALS['client_email'],
+               },
+          };
+
+          const intentsClient = new IntentsClient(CONFIGURATION);
+          const projectPath = intentsClient.projectAgentPath(
+               CREDENTIALS.project_id
+          );
+
+          const [intents] = await intentsClient.listIntents({
+               parent: projectPath,
+          });
+          const intent = intents.find((i) => i.displayName === displayName);
+          if (!intent) throw new Error(`Intent ${displayName} no encontrado`);
+
+          intent.trainingPhrases = [
+               {
+                    type: 'EXAMPLE',
+                    parts: trainingParts,
+               },
+          ];
+          intent.messages = [
+               {
+                    text: { text: [respuesta] },
+               },
+          ];
+          intent.inputContextNames = contextsIn.map(
+               (ctx) => `${projectPath}/contexts/${ctx}`
+          );
+          intent.outputContexts = contextsOut;
+          intent.webhookState = webhook
+               ? 'WEBHOOK_STATE_ENABLED'
+               : 'WEBHOOK_STATE_DISABLED';
+
+          await intentsClient.updateIntent({
+               intent,
+               updateMask: {
+                    paths: [
+                         'training_phrases',
+                         'messages',
+                         'input_context_names',
+                         'output_contexts',
+                         'webhook_state',
+                    ],
+               },
+          });
      }
 }

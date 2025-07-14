@@ -29,6 +29,11 @@ import {
      PreguntaAsistenteSchema,
 } from './models/preguntas-asistente.js';
 import { createPreguntaAsistenteRouter } from './routes/pregunta-asistente.js';
+import { createVariablePreguntaRouter } from './routes/variable_pregunta.js';
+import {
+     VariablePreguntaModel,
+     VariablePreguntaSchema,
+} from './models/variable-pregunta.js';
 
 import './models/relaciones-tablas.js';
 
@@ -119,6 +124,12 @@ app.use(
           PreguntaAsistenteModel,
           PreguntaAsistenteSchema
      )
+);
+
+//consultas con respecto a las categorias de productos
+app.use(
+     '/variable-pregunta',
+     createVariablePreguntaRouter(VariablePreguntaModel, VariablePreguntaSchema)
 );
 
 //Servidor escuchando la conexion

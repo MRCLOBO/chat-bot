@@ -10,41 +10,85 @@ const axios = require('axios');
 import { Sequelize, DataTypes, Op, where, fn, col } from 'sequelize';
 import { PreguntaAsistenteSchema } from '../models/preguntas-asistente.js';
 import { RespuestaAsistenteSchema } from '../models/respuesta-asistente.js';
+import { CategoriaSchema } from '../models/categoria.js';
 
 export class AtencionClienteController {
-     //CREDENCIALES DE HELPI
-     CREDENTIALS = JSON.parse(process.env.DF_HELPI_KEY);
-     PROJECTID = this.CREDENTIALS.project_id;
-     CONFIGURATION = {
-          credentials: {
-               private_key: this.CREDENTIALS['private_key'],
-               client_email: this.CREDENTIALS['client_email'],
-          },
-     };
-
-     //SE CREA UNA NUEVA SESION
-     sessionClient = new dialogflow.SessionsClient(this.CONFIGURATION);
-
-     //DETECTAR INTENT METHOD
      detectIntent = async (
           languageCode,
           queryText,
           sessionId,
-          infoAsistente
+          infoAsistente,
+          esInicioConversacion = false
      ) => {
-          let sessionPath = this.sessionClient.projectAgentSessionPath(
-               this.PROJECTID,
+          const configAgente = await NegocioSchema.findOne({
+               where: { id_negocio: infoAsistente.id_negocio },
+          });
+
+          if (!configAgente || !configAgente.api_key) {
+               throw new Error(
+                    'Credenciales de Dialogflow no encontradas para este negocio'
+               );
+          }
+
+          const CREDENTIALS = JSON.parse(configAgente.api_key);
+
+          const CONFIGURATION = {
+               credentials: {
+                    private_key: CREDENTIALS['private_key'],
+                    client_email: CREDENTIALS['client_email'],
+               },
+          };
+
+          const PROJECTID = CREDENTIALS.project_id;
+
+          const sessionClient = new dialogflow.SessionsClient(CONFIGURATION);
+
+          const sessionPath = sessionClient.projectAgentSessionPath(
+               PROJECTID,
                sessionId
           );
 
-          //EL TEXTO DEL QUERY REQUEST
-          let request = {
+          // 👉 Solo si es el primer mensaje: crear entidades
+          if (esInicioConversacion) {
+               const productos = await ProductoSchema.findAll({
+                    attributes: ['nombre_producto', 'precio'],
+                    where: { id_negocio: infoAsistente.id_negocio },
+               });
+
+               const categorias = await CategoriaSchema.findAll({
+                    attributes: ['nombre_categoria'],
+                    where: { id_negocio: infoAsistente.id_negocio },
+               });
+
+               const nombres = [
+                    ...new Set(productos.map((p) => p.nombre_producto)),
+               ];
+               const precios = [
+                    ...new Set(productos.map((p) => p.precio.toString())),
+               ];
+               const categoriasVariables = [
+                    ...new Set(categorias.map((c) => c.nombre_categoria)),
+               ];
+
+               await this.crearSessionEntities(
+                    sessionId,
+                    [
+                         { entityName: 'productoNombre', values: nombres },
+                         {
+                              entityName: 'productoCategoria',
+                              values: categoriasVariables,
+                         },
+                         { entityName: 'productoPrecio', values: precios },
+                    ],
+                    configAgente
+               );
+          }
+
+          const request = {
                session: sessionPath,
                queryInput: {
                     text: {
-                         //EL QUERY A MANDAR AL AGENTE DE DIALOGFLOW
                          text: queryText,
-                         //EL LENGUAJE UTILIZADO POR EL CLIENTE es
                          languageCode: languageCode,
                     },
                },
@@ -66,32 +110,27 @@ export class AtencionClienteController {
                },
           };
 
-          //ENVIAR UNA RESPUESTA Y ESPERAR UN LOG RESULT
-          const responses = await this.sessionClient.detectIntent(request);
+          const responses = await sessionClient.detectIntent(request);
           const result = responses[0].queryResult;
 
           return {
                response: result.fulfillmentText,
           };
      };
-
      consulta = async (req, res) => {
           try {
-               const { sessionID, consultaUsuario, infoAsistente } = req.body;
-               //Se realiza una consulta a los productos del negocio para poder realizar un entitie de estos
-               const productos = await ProductoSchema.findAll({
-                    attributes: ['nombre_producto'],
-                    where: {
-                         id_negocio: infoAsistente.id_negocio, // asegurate de que esta variable tenga el valor correcto
-                    },
-               });
-               const productosNombres = productos.map((p) => p.nombre_producto);
-               await this.crearSessionEntity(sessionID, productosNombres);
+               const {
+                    sessionID,
+                    consultaUsuario,
+                    infoAsistente,
+                    esInicioConversacion,
+               } = req.body;
                const respuestaBOT = await this.detectIntent(
                     'es',
                     consultaUsuario,
                     sessionID,
-                    infoAsistente
+                    infoAsistente,
+                    esInicioConversacion // esto es importante
                );
 
                return res.json({
@@ -101,13 +140,13 @@ export class AtencionClienteController {
                });
           } catch (error) {
                console.log(
-                    '###Ocurrio un error al hacer la consulta al chatbot###',
+                    '###Ocurrió un error al hacer la consulta al chatbot###',
                     error,
                     '################################'
                );
                return res.json({
                     type: 'error',
-                    message: 'Ocurrio un error en el servidor, por favor intentelo de nuevo mas tarde',
+                    message: 'Ocurrió un error en el servidor, por favor intentelo de nuevo más tarde',
                });
           }
      };
@@ -119,6 +158,10 @@ export class AtencionClienteController {
                const id_negocio = infoAsistente?.id_negocio;
                const intencion = req.body.queryResult.intent.displayName;
                let respuesta = '';
+               const parametros = req.body.queryResult.parameters || {};
+               const nombreProducto = parametros?.productoNombre;
+               const precioProducto = Number(parametros?.productoPrecio);
+               const categoriaProducto = parametros?.productoCategoria;
                const negocio = await NegocioSchema.findOne({
                     where: { id_negocio },
                });
@@ -146,66 +189,77 @@ export class AtencionClienteController {
                                         'Lo siento, no entendi muy bien tu consulta. Me lo podrias especificar, por favor.',
                               });
                          }
-                         const respuestaDB =
-                              await RespuestaAsistenteSchema.findOne({
-                                   where: {
-                                        id_negocio,
-                                        id_pregunta: pregunta.id_pregunta,
-                                   },
-                              });
-                         if (respuestaDB?.respuesta) {
-                              const datosNegocio = {
-                                   negocio: negocio,
+                         let producto;
+                         const where = {
+                              id_negocio: infoAsistente.id_negocio, // obligatorio
+                         };
+
+                         if (nombreProducto) {
+                              where.nombre_producto = {
+                                   [Op.iLike]: `%${nombreProducto}%`,
                               };
-                              respuesta = this.renderTemplate(
-                                   respuestaDB.respuesta,
-                                   datosNegocio
-                              );
-                              // respuesta = `Quien se encuentra a cargo del negocio es ${negocio.propietario}. Si quieres puedes escribirle un mensaje en el siguiente correo "${negocio.email}"`;
-                         } else {
-                              respuesta = `Disculpa, no entendi muy bien tu consulta ¿Podrias ser mas especifico?`;
                          }
+
+                         if (precioProducto) {
+                              where.precio = precioProducto; // o podés convertir a número si viene como string
+                         }
+
+                         // Acá necesitás incluir la categoría relacionada y filtrar por su nombre
+                         const includeCategoria = {
+                              model: CategoriaSchema,
+                              as: 'categoria',
+                              attributes: ['nombre_categoria'],
+                              ...(categoriaProducto && {
+                                   where: {
+                                        nombre_categoria: {
+                                             [Op.iLike]: `%${categoriaProducto}%`,
+                                        },
+                                   },
+                              }),
+                         };
+
+                         if (
+                              nombreProducto ||
+                              categoriaProducto ||
+                              precioProducto
+                         ) {
+                              producto = await ProductoSchema.findOne({
+                                   where,
+                                   include: [includeCategoria],
+                                   raw: true,
+                              });
+
+                              if (!producto) {
+                                   return res.json({
+                                        fulfillmentText: `Lo siento, no tenemos el articulo que deseas.Si necesitas algun otro articulo puedes decirmelo'.`,
+                                   });
+                              }
+                              if (producto.cantidad < 1) {
+                                   return res.json({
+                                        fulfillmentText: `Lo siento, ya no tenemos stock de '${nombreProducto}' si necesitas algun otro articulo puedes decirmelo'.`,
+                                   });
+                              }
+                         }
+
+                         const datosNegocio = {
+                              productoNombre: producto?.nombre_producto,
+                              productoCategoria:
+                                   producto?.categoria?.nombre_categoria,
+                              productoPrecio: producto?.precio,
+                              productoCantidad: producto?.cantidad,
+                              nombreNegocio: negocio.nombre_negocio,
+                              direccionNegocio: negocio.direccion,
+                              correoNegocio: negocio.email,
+                              propietarioNegocio: negocio.propietario,
+                              telefonoNegocio: negocio.telefono,
+                         };
+                         respuesta = this.renderTemplate(
+                              pregunta.respuesta,
+                              datosNegocio
+                         );
                     }
                     if (intencion === 'Default Fallback Intent') {
-                         const preguntas =
-                              await PreguntaAsistenteSchema.findAll({
-                                   where: { id_negocio: id_negocio },
-                              });
-                         // Paso 2: Capturás el texto ingresado por el usuario
-                         const textoUsuario = req.body.queryResult.queryText
-                              .toLowerCase()
-                              .trim();
-
-                         // Paso 3: Buscás una coincidencia aproximada
-                         const preguntaMatch = preguntas.find((p) => {
-                              const preguntaPrincipal = (
-                                   p.pregunta || ''
-                              ).toLowerCase();
-                              const sinonimos =
-                                   p.sinonimos?.map((s) => s.toLowerCase()) ||
-                                   [];
-
-                              return (
-                                   textoUsuario.includes(preguntaPrincipal) ||
-                                   sinonimos.some((sin) =>
-                                        textoUsuario.includes(sin)
-                                   )
-                              );
-                         });
-
-                         // Paso 4: Si encontrás coincidencia, respondés
-                         if (preguntaMatch) {
-                              const datosNegocio = {
-                                   negocio: negocio,
-                              };
-                              const respuestaBD = preguntaMatch.respuesta; // o cargás desde RespuestaAsistenteSchema si estás personalizando por negocio
-                              respuesta = this.renderTemplate(
-                                   respuestaBD,
-                                   datosNegocio
-                              );
-                         } else {
-                              respuesta = `Disculpa, no entendi muy bien tu consulta ¿Podrias ser mas especifico?`;
-                         }
+                         respuesta = `Disculpa, no entendi muy bien tu consulta ¿Podrias ser mas especifico?`;
                     }
 
                     return res.json({
@@ -221,175 +275,6 @@ export class AtencionClienteController {
                               'Disculpe pero ocurrio un error interno del servidor al intentar responder su consulta. Por favor, intente de nuevo más tarde.',
                     });
                }
-
-               // switch (intencion) {
-               //      case 'infoHorario':
-               //           try {
-               //                const horarios = await HorarioSchema.findAll({
-               //                     where: { id_negocio },
-               //                });
-
-               //                const respuestaHorario =
-               //                     this.construirMensajeHorarios(horarios);
-
-               //                return res.json({
-               //                     fulfillmentText: respuestaHorario,
-               //                });
-               //           } catch (error) {
-               //                console.error(
-               //                     'Error al consultar horarios:',
-               //                     error
-               //                );
-               //                return res.json({
-               //                     fulfillmentText:
-               //                          'Ocurrió un error al consultar el horario. Intenta más tarde.',
-               //                });
-               //           }
-               //           break;
-               //      case 'consultarDisponibilidadProducto':
-               //           const nombreProductoRaw =
-               //                req.body.queryResult.parameters['producto'];
-               //           const nombreProducto = Array.isArray(nombreProductoRaw)
-               //                ? nombreProductoRaw[0]
-               //                : nombreProductoRaw;
-
-               //           const nombreProductoLower =
-               //                String(nombreProducto).toLowerCase();
-
-               //           try {
-               //                const productos = await ProductoSchema.findAll({
-               //                     where: {
-               //                          [Op.and]: [
-               //                               where(
-               //                                    fn(
-               //                                         'LOWER',
-               //                                         col('nombre_producto')
-               //                                    ),
-               //                                    {
-               //                                         [Op.like]: `%${nombreProductoLower}%`,
-               //                                    }
-               //                               ),
-               //                               { id_negocio: id_negocio },
-               //                          ],
-               //                     },
-               //                     limit: 5,
-               //                });
-
-               //                let respuesta;
-
-               //                if (productos.length === 0) {
-               //                     respuesta = `Lo siento, no tenemos el producto "${nombreProducto}".`;
-               //                } else if (productos.length === 1) {
-               //                     const producto = productos[0];
-
-               //                     if (producto.cantidad > 5) {
-               //                          const precio = this.formatearGs(
-               //                               producto.precio
-               //                          );
-               //                          respuesta = `Sí, el producto "${producto.nombre_producto}" está disponible con un costo de ${precio}.`;
-               //                     } else if (producto.cantidad > 0) {
-               //                          const precio = this.formatearGs(
-               //                               producto.precio
-               //                          );
-               //                          respuesta = `Sí, nos quedan solo ${producto.cantidad} unidades de "${producto.nombre_producto}" este cuenta con un precio de ${precio}.`;
-               //                     } else {
-               //                          respuesta = `Lo siento, pero actualmente no tenemos disponibilidad de "${producto.nombre_producto}".`;
-               //                     }
-
-               //                     await producto.increment('consultas', {
-               //                          by: 1,
-               //                     });
-               //                } else {
-               //                     // Más de un producto coincide
-               //                     const nombresEjemplo = productos
-               //                          .map((p) => `"${p.nombre_producto}"`)
-               //                          .join(', ');
-               //                     respuesta = `Tenemos varios articulos que coinciden con "${nombreProducto}". ¿Podrías especificar mejor cuál buscás? Algunos de ellos son: ${nombresEjemplo}.`;
-               //                }
-
-               //                return res.json({
-               //                     fulfillmentText: respuesta,
-               //                });
-               //           } catch (error) {
-               //                console.error(error);
-               //                return res.json({
-               //                     fulfillmentText:
-               //                          'Ocurrió un error al consultar la disponibilidad. Por favor, intente nuevamente.',
-               //                });
-               //           }
-               //           break;
-               //      case 'infoJefe':
-
-               //           break;
-               //      case 'infoDireccion':
-               //           try {
-               //                const valorParametro =
-               //                     req.body.queryResult.parameters.direccion;
-               //                const negocio = await NegocioSchema.findOne({
-               //                     where: { id_negocio },
-               //                });
-               //                let respuesta = '';
-               //                if (valorParametro) {
-               //                     respuesta = `El negocio se encuentra en la direccion: ${negocio.direccion}, si llegas a tener problemas en encontrarnos puedes contactarnos por el siguiente numero ${negocio.telefono}`;
-               //                } else {
-               //                     respuesta = `Disculpa, no entendi muy bien tu consulta ¿Podrias ser mas especifico?`;
-               //                }
-
-               //                return res.json({
-               //                     fulfillmentText: respuesta,
-               //                });
-               //           } catch (error) {
-               //                console.error(
-               //                     `ERROR al consultar sobre infoDireccion, valor de infoDireccion: ${valorParametro}:`,
-               //                     error
-               //                );
-               //                return res.json({
-               //                     fulfillmentText:
-               //                          'Disculpe pero ocurrio un error interno del servidor al intentar responder su consulta. Por favor, intente de nuevo más tarde.',
-               //                });
-               //           }
-               //           break;
-               //      case 'infoContacto':
-               //           try {
-               //                const valorParametro =
-               //                     req.body.queryResult.parameters.infoContacto;
-               //                const negocio = await NegocioSchema.findOne({
-               //                     where: { id_negocio },
-               //                });
-               //                let respuesta = '';
-               //                if (valorParametro) {
-               //                     respuesta = `El negocio cuenta con el siguiente numero: ${negocio.telefono}, y con el correo: '${negocio.email}' por si necesitas algun otro tipo de asistencia en la cuál no te pueda ayudar`;
-               //                } else {
-               //                     respuesta = `Disculpa, no entendi muy bien tu consulta ¿Podrias ser mas especifico?`;
-               //                }
-
-               //                return res.json({
-               //                     fulfillmentText: respuesta,
-               //                });
-               //           } catch (error) {
-               //                console.error(
-               //                     `ERROR al consultar sobre infoContacto, valor de infoContacto: ${valorParametro}:`,
-               //                     error
-               //                );
-               //                return res.json({
-               //                     fulfillmentText:
-               //                          'Disculpe pero ocurrio un error interno del servidor al intentar responder su consulta. Por favor, intente de nuevo más tarde.',
-               //                });
-               //           }
-               //           break;
-               //      default:
-               //           break;
-               // }
-
-               // console.log(
-               //      '###  PREGUNTA PROVENIENTE DE CHATBOT ####',
-               //      req.body,
-               //      '###############################'
-               // );
-               // res.send({
-               //      fulfillmentText:
-               //           'Hola este es un mensaje que proviene del backend, ¿No me crees? una respuesta generica diria esto... Chimichangas!',
-               // });
           } catch (error) {
                console.log(
                     '###Ocurrio un error al responder la consulta del chatbot###',
@@ -478,37 +363,7 @@ export class AtencionClienteController {
                minimumFractionDigits: 0, // Guaraníes no usan decimales normalmente
           }).format(monto);
      };
-     async crearSessionEntity(sessionId, productosNombres) {
-          const CREDENTIALS = JSON.parse(process.env.DF_HELPI_KEY);
-          const auth = new GoogleAuth({
-               credentials: CREDENTIALS,
-               scopes: 'https://www.googleapis.com/auth/cloud-platform',
-          });
 
-          const client = await auth.getClient();
-          const accessToken = await client.getAccessToken();
-          const projectId = process.env.DF_PROYECT_ID;
-          const entityTypeName = 'producto';
-          const sessionEntity = {
-               name: `projects/${projectId}/agent/sessions/${sessionId}/entityTypes/${entityTypeName}`,
-               entityOverrideMode: 'ENTITY_OVERRIDE_MODE_OVERRIDE',
-               entities: productosNombres.map((nombre) => ({
-                    value: nombre,
-                    synonyms: [nombre],
-               })),
-          };
-
-          await axios.post(
-               `https://dialogflow.googleapis.com/v2/projects/${projectId}/agent/sessions/${sessionId}/entityTypes`,
-               sessionEntity,
-               {
-                    headers: {
-                         Authorization: `Bearer ${accessToken.token}`,
-                         'Content-Type': 'application/json',
-                    },
-               }
-          );
-     }
      renderTemplate(template, datos) {
           return template.replace(/\{\s*([\w.]+)\s*\}/g, (_, path) => {
                const value = path.split('.').reduce((obj, key) => {
@@ -516,5 +371,44 @@ export class AtencionClienteController {
                }, datos);
                return value !== undefined ? value : `{${path}}`; // si no encuentra, deja el placeholder
           });
+     }
+
+     async crearSessionEntities(sessionID, entidades, configAgente) {
+          if (!configAgente || !configAgente.api_key) {
+               throw new Error('Credenciales de Dialogflow no encontradas');
+          }
+
+          const CREDENTIALS = JSON.parse(configAgente.api_key);
+
+          const CONFIGURATION = {
+               credentials: {
+                    private_key: CREDENTIALS.private_key,
+                    client_email: CREDENTIALS.client_email,
+               },
+          };
+
+          const client = new dialogflow.SessionEntityTypesClient(CONFIGURATION);
+
+          const sessionPath = client.projectAgentSessionPath(
+               CREDENTIALS.project_id,
+               sessionID
+          );
+
+          const requests = entidades.map(({ entityName, values }) => ({
+               parent: sessionPath,
+               sessionEntityType: {
+                    name: `${sessionPath}/entityTypes/${entityName}`,
+                    entityOverrideMode: 'ENTITY_OVERRIDE_MODE_SUPPLEMENT',
+                    entities: values.map((v) => ({
+                         value: v,
+                         synonyms: [v],
+                    })),
+               },
+          }));
+
+          // Crear todas las session entities en paralelo
+          await Promise.all(
+               requests.map((r) => client.createSessionEntityType(r))
+          );
      }
 }

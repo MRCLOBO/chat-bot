@@ -19,17 +19,37 @@ export const PreguntaAsistenteSchema = sequelize.define(
                defaultValue: '',
           },
           intencion: {
-               type: DataTypes.TEXT,
-               allowNull: true,
+               type: DataTypes.STRING,
+               allowNull: false,
           },
           id_negocio: {
                type: DataTypes.INTEGER,
                allowNull: true,
           },
           sinonimos: {
-               type: DataTypes.ARRAY(DataTypes.TEXT), // ✅ array de strings
+               type: DataTypes.ARRAY(DataTypes.TEXT),
                allowNull: true,
                defaultValue: [],
+          },
+          contexto_entrada: {
+               type: DataTypes.ARRAY(DataTypes.TEXT),
+               allowNull: true,
+               defaultValue: [],
+          },
+          contexto_salida: {
+               type: DataTypes.ARRAY(DataTypes.TEXT),
+               allowNull: true,
+               defaultValue: [],
+          },
+          variables_pregunta: {
+               type: DataTypes.ARRAY(DataTypes.TEXT),
+               allowNull: true,
+               defaultValue: [],
+          },
+          webhook: {
+               type: DataTypes.BOOLEAN,
+               allowNull: false,
+               defaultValue: false,
           },
      },
      {
