@@ -34,6 +34,8 @@ import {
      VariablePreguntaModel,
      VariablePreguntaSchema,
 } from './models/variable-pregunta.js';
+import { createTiendaRouter } from './routes/tienda.js';
+import { TiendaModel, TiendaSchema } from './models/tienda.js';
 
 import './models/relaciones-tablas.js';
 
@@ -131,6 +133,9 @@ app.use(
      '/variable-pregunta',
      createVariablePreguntaRouter(VariablePreguntaModel, VariablePreguntaSchema)
 );
+
+//consultas con respecto a las categorias de productos
+app.use('/tienda', createTiendaRouter(TiendaModel, TiendaSchema));
 
 //Servidor escuchando la conexion
 app.listen(PORT, () => {

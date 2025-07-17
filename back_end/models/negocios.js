@@ -44,6 +44,10 @@ export const NegocioSchema = sequelize.define(
                type: DataTypes.TEXT,
                allowNull: false,
           },
+          id_publico: {
+               type: DataTypes.TEXT,
+               allowNull: false,
+          },
      },
      {
           tableName: 'negocio',
