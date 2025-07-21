@@ -12,6 +12,8 @@ export class NegocioController {
      create = async (req, res) => {
           try {
                const nuevoNegocio = req.body;
+               const idNegocio = await this.obtenerUltimoID();
+               nuevoNegocio.id_negocio = idNegocio;
                const respuestaBD = await this.negocioSchema.create(
                     nuevoNegocio
                );
@@ -101,13 +103,10 @@ export class NegocioController {
                return { type: 'error', message: 'Negocio no encontrado' };
           return negocio;
      }
-     async obtenerUltimoID(id_negocio) {
+     async obtenerUltimoID() {
           try {
                const ultimoRegistro = await this.negocioSchema.findOne({
                     order: [['id_negocio', 'DESC']],
-                    where: {
-                         id_negocio: id_negocio,
-                    },
                });
                if (ultimoRegistro) {
                     return ultimoRegistro.id_negocio + 1;

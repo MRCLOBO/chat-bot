@@ -1,33 +1,58 @@
 import { Op, where } from 'sequelize';
 import { NegocioSchema } from '../models/negocios.js';
 
-export class ProductoController {
-     constructor(productoModel, productoSchema) {
-          this.productoModel = productoModel;
-          this.productoSchema = productoSchema;
+export class OrdenVentaController {
+     constructor(ordenVentaModel, ordenVentaSchema) {
+          this.ordenVentaModel = ordenVentaModel;
+          this.ordenVentaSchema = ordenVentaSchema;
           this.NegocioSchema = new NegocioSchema();
      }
      getAll = async (req, res) => {
-          const producto = await this.productoSchema.findAll();
-          return res.status(200).json(producto);
+          const ordenVenta = await this.ordenVentaSchema.findAll();
+          return res.status(200).json(ordenVenta);
      };
 
      create = async (req, res) => {
+          const t = await sequelize.transaction(); // 1. Iniciar transacción
           try {
-               const nuevoProducto = req.body;
-               nuevoProducto['id_producto'] = await this.obtenerUltimoID();
-               const respuestaBD = await this.productoSchema.create(
-                    nuevoProducto
-               );
+               const datos = req.body;
+
+               // Extraer los artículos y quitar del objeto principal
+               const articulos = datos.articulos;
+               delete datos.articulos;
+
+               // 2. Crear la orden de venta
+               const nuevaOrden = await this.ordenVentaSchema.create(datos, {
+                    transaction: t,
+               });
+
+               // 3. Insertar artículos con el ID de la orden recién creada
+               for (const art of articulos) {
+                    await this.ordenVentaArticuloSchema.create(
+                         {
+                              id_orden_venta: nuevaOrden.id_orden_venta,
+                              id_negocio: datos.id_negocio,
+                              id_articulo: art.id_articulo,
+                              precio: art.precio,
+                              cantidad: art.cantidad,
+                         },
+                         { transaction: t }
+                    );
+               }
+
+               // 4. Confirmar la transacción
+               await t.commit();
+
                return res.status(200).json({
                     type: 'success',
-                    message: 'Producto creado con exito!',
-                    bd: respuestaBD,
+                    message: 'Orden de venta y artículos creados con éxito.',
+                    orden: nuevaOrden,
                });
           } catch (error) {
-               res.status(500).json({
+               await t.rollback(); // Si algo falla, se revierte todo
+               return res.status(500).json({
                     type: 'error',
-                    message: `Error al crear el producto por el siguiente error: ${error}`,
+                    message: `Error al crear la orden de venta: ${error}`,
                });
           }
      };
@@ -36,13 +61,13 @@ export class ProductoController {
                const filtros = await this.limpiarCampos(req.body);
                const condiciones = [];
                // Filtro LIKE para 'nombre'
-               if (filtros.nombre_producto) {
+               if (filtros.nombre_cliente) {
                     condiciones.push({
-                         nombre_producto: {
-                              [Op.like]: `%${filtros.nombre_producto}%`,
+                         nombre_cliente: {
+                              [Op.like]: `%${filtros.nombre_cliente}%`,
                          },
                     });
-                    delete filtros.nombre_producto;
+                    delete filtros.nombre_cliente;
                }
                // Extraer los valores de ordenamiento y eliminarlos del objeto de filtros
                const campoOrden = filtros.orden;
@@ -60,14 +85,14 @@ export class ProductoController {
                if (campoOrden && tipoOrden) {
                     opcionesConsulta.order = [[campoOrden, tipoOrden]];
                }
-               const productos = await this.productoSchema.findAll(
+               const productos = await this.ordenVentaSchema.findAll(
                     opcionesConsulta
                );
                return res.status(200).json(productos);
           } catch (error) {
                res.status(500).json({
                     type: 'error',
-                    message: `Error al consultar los productos: ${error}`,
+                    message: `Error al consultar las ordenes de venta: ${error}`,
                });
           }
      };
@@ -76,17 +101,32 @@ export class ProductoController {
                const filtros = await this.limpiarCampos(req.body);
                const condiciones = [];
 
-               // Si recibís un array, hacés un IN
+               // 1. Filtro por fechas si vienen
+               const fechaDesde = filtros.fecha_desde;
+               const fechaHasta = filtros.fecha_hasta;
+
+               if (fechaDesde || fechaHasta) {
+                    const rangoFechas = {};
+                    if (fechaDesde) {
+                         rangoFechas[Op.gte] = new Date(fechaDesde);
+                    }
+                    if (fechaHasta) {
+                         rangoFechas[Op.lte] = new Date(fechaHasta);
+                    }
+                    condiciones.push({ fecha_creacion: rangoFechas });
+
+                    // Eliminar los campos especiales para que no entren en el for
+                    delete filtros.fecha_desde;
+                    delete filtros.fecha_hasta;
+               }
+
+               // 2. Recorrer los demás filtros normales
                for (const key in filtros) {
                     const valor = filtros[key];
 
-                    // Si es array, usar IN
                     if (Array.isArray(valor)) {
                          condiciones.push({ [key]: { [Op.in]: valor } });
-                    }
-
-                    // Si es objeto con operador explícito
-                    else if (
+                    } else if (
                          typeof valor === 'object' &&
                          valor.operador &&
                          valor.valor !== undefined
@@ -116,10 +156,7 @@ export class ProductoController {
                          condiciones.push({
                               [key]: { [operadorSequelize]: valor.valor },
                          });
-                    }
-
-                    // Valor exacto
-                    else {
+                    } else {
                          condiciones.push({ [key]: valor });
                     }
                }
@@ -128,62 +165,46 @@ export class ProductoController {
                     where: { [Op.and]: condiciones },
                };
 
-               const productos = await this.productoSchema.findAll(
+               const ordenes = await this.ordenVentaSchema.findAll(
                     opcionesConsulta
                );
 
-               return res.status(200).json(productos);
+               return res.status(200).json(ordenes);
           } catch (error) {
                res.status(500).json({
                     type: 'error',
-                    message: `Error al consultar múltiples productos: ${error}`,
+                    message: `Error al consultar órdenes de venta: ${error}`,
                });
           }
      };
+
      delete = async (req, res) => {
           try {
-               const producto = await this.getProducto(req.body);
-               await producto.destroy();
-               res.json({ mensaje: 'Producto eliminado correctamente' });
+               const ordenVenta = await this.getOrdenVenta(req.body);
+               await ordenVenta.destroy();
+               res.json({ mensaje: 'Orden de venta eliminada correctamente' });
           } catch (error) {
                res.status(500).json({
                     type: 'error',
-                    message: `Error al eliminar al producto por el siguiente error: ${error}`,
+                    message: `Error al eliminar la orden de venta por el siguiente error: ${error}`,
                });
           }
      };
 
      update = async (req, res) => {
-          const producto = await this.getProducto(req.body);
+          const ordenVenta = await this.getOrdenVenta(req.body);
           const filtros = await this.limpiarCampos(req.body);
-          delete filtros.id_producto;
-          const resultado = await this.productoSchema.update(filtros, {
+          delete filtros.id_orden_venta;
+          const resultado = await this.ordenVentaSchema.update(filtros, {
                where: {
-                    id_negocio: producto.id_negocio,
-                    id_producto: producto.id_producto,
+                    id_negocio: ordenVenta.id_negocio,
+                    id_orden_venta: ordenVenta.id_orden_venta,
                },
           });
-          return res.json({ type: 'success', message: 'Producto modificado' });
-     };
-
-     masConsultado = async (req, res) => {
-          try {
-               const filtros = req.body;
-               const opcionesConsulta = {
-                    where: { [Op.and]: filtros },
-                    order: [['consultas', 'DESC']],
-                    limit: 5,
-               };
-               const productos = await this.productoSchema.findAll(
-                    opcionesConsulta
-               );
-               return res.status(200).json(productos);
-          } catch (error) {
-               res.status(500).json({
-                    type: 'error',
-                    message: `Error al consultar los productos: ${error}`,
-               });
-          }
+          return res.json({
+               type: 'success',
+               message: 'Orden de venta modificada',
+          });
      };
 
      async limpiarCampos(filtros) {
@@ -194,32 +215,35 @@ export class ProductoController {
           return filtrosLimpios;
      }
 
-     async getProducto(filtros) {
+     async getOrdenVenta(filtros) {
           try {
                // Se busca al producto por su id y id_negocio por la primary key compuesta
-               const producto = await this.productoSchema.findOne({
+               const ordenVenta = await this.ordenVentaSchema.findOne({
                     where: {
                          id_negocio: filtros.id_negocio,
-                         id_producto: filtros.id_producto,
+                         id_orden_venta: filtros.id_orden_venta,
                     },
                });
-               if (!producto)
-                    return { type: 'error', message: 'Producto no encontrado' };
-               return producto;
+               if (!ordenVenta)
+                    return {
+                         type: 'error',
+                         message: 'Orden de venta no encontrada',
+                    };
+               return ordenVenta;
           } catch (error) {
                return {
                     type: 'error',
-                    message: `Producto no encontrado`,
+                    message: `Orden de venta no encontrada`,
                };
           }
      }
-     async obtenerUltimoID(id_negocio) {
+     async obtenerUltimoID() {
           try {
-               const ultimoRegistro = await this.productoSchema.findOne({
-                    order: [['id_producto', 'DESC']],
+               const ultimoRegistro = await this.ordenVentaSchema.findOne({
+                    order: [['id_orden_venta', 'DESC']],
                });
                if (ultimoRegistro) {
-                    return ultimoRegistro.id_producto + 1;
+                    return ultimoRegistro.id_orden_venta + 1;
                } else {
                     return 1;
                }
@@ -241,26 +265,6 @@ export class ProductoController {
                     type: 'error',
                     message: 'Error al recuperar la informacion del negocio',
                     error: error,
-               };
-          }
-     }
-     async existeNombre(nombre, id_negocio) {
-          try {
-               const producto = await this.productoSchema.findOne({
-                    where: {
-                         nombre_producto: nombre,
-                         id_negocio: id_negocio,
-                    },
-               });
-               if (producto) {
-                    return true;
-               } else {
-                    return false;
-               }
-          } catch (error) {
-               return {
-                    type: 'error',
-                    message: 'Error al consultar si ya existe el nombre',
                };
           }
      }

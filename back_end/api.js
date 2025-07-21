@@ -38,6 +38,8 @@ import { createTiendaRouter } from './routes/tienda.js';
 import { TiendaModel, TiendaSchema } from './models/tienda.js';
 
 import './models/relaciones-tablas.js';
+import { OrdenVentaModel, OrdenVentaSchema } from './models/orden_venta.js';
+import { createOrdenVentaRouter } from './routes/orden_venta.js';
 
 const PORT = process.env.API_PORT ?? 3006;
 const app = express();
@@ -136,6 +138,12 @@ app.use(
 
 //consultas con respecto a las categorias de productos
 app.use('/tienda', createTiendaRouter(TiendaModel, TiendaSchema));
+
+//consultas con respecto a las categorias de productos
+app.use(
+     '/orden-venta',
+     createOrdenVentaRouter(OrdenVentaModel, OrdenVentaSchema)
+);
 
 //Servidor escuchando la conexion
 app.listen(PORT, () => {

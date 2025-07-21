@@ -64,6 +64,11 @@ export const TiendaSchema = sequelize.define(
                type: DataTypes.STRING,
                allowNull: true,
           },
+          color_texto: {
+               type: DataTypes.STRING,
+               allowNull: false,
+               defaultValue: 'rgb(40,40,40)',
+          },
      },
      {
           tableName: 'tienda',
