@@ -6,14 +6,6 @@ export class AsistenteController {
           this.asistenteModel = asistenteModel;
           this.asistenteSchema = asistenteSchema;
           this.NegocioSchema = new NegocioSchema();
-          // this.categoriaSchema.hasMany(ProductoSchema, {
-          //      foreignKey: 'id_categoria',
-          //      as: 'producto',
-          // });
-          // ProductoSchema.belongsTo(this.categoriaSchema, {
-          //      foreignKey: 'id_categoria',
-          //      as: 'categoria',
-          // });
      }
 
      getAll = async (req, res) => {

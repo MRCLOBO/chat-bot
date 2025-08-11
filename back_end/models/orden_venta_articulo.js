@@ -29,6 +29,10 @@ export const OrdenVentaArticuloSchema = sequelize.define(
                type: DataTypes.INTEGER,
                allowNull: false,
           },
+          nombre_articulo: {
+               type: DataTypes.TEXT,
+               allowNull: false,
+          },
      },
      {
           tableName: 'orden_venta_articulo',

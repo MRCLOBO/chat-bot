@@ -1,21 +1,18 @@
 import { Router } from 'express';
 import { AsistenteController } from '../controller/asistente.js';
+import { createBaseRouter } from './base-router.js';
 //exportamos el router para la inyeccion de dependencia de modelo, para recibir por parametro el modelo
 export const createAsistenteRouter = (AsistenteModel, AsistenteSchema) => {
-     const asistenteRouter = Router();
-
      const asistenteController = new AsistenteController(
           AsistenteModel,
           AsistenteSchema
      );
 
-     asistenteRouter.post('/create', asistenteController.create);
+     // Creamos el router con las rutas básicas
+     const asistenteRouter = createBaseRouter(asistenteController);
 
-     asistenteRouter.post('/getBy', asistenteController.getBy);
-
-     asistenteRouter.post('/delete', asistenteController.delete);
-
-     asistenteRouter.post('/update', asistenteController.update);
+     // Rutas extra específicas de Asistente
+     //asistenteRouter.post('/buscarPorNombre', asistenteController.buscarPorNombre);
 
      return asistenteRouter;
 };

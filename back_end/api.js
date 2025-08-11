@@ -41,7 +41,7 @@ import './models/relaciones-tablas.js';
 import { OrdenVentaModel, OrdenVentaSchema } from './models/orden_venta.js';
 import { createOrdenVentaRouter } from './routes/orden_venta.js';
 
-const PORT = process.env.API_PORT ?? 3006;
+const PORT = process.env.API_PORT;
 const app = express();
 app.disable('x-powered-by');
 app.use(corsMiddleware());
