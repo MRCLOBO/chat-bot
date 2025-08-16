@@ -35,6 +35,11 @@ export const OrdenVentaSchema = sequelize.define(
                allowNull: true,
                defaultValue: '',
           },
+          estado: {
+               type: DataTypes.BOOLEAN,
+               allowNull: true,
+               defaultValue: null,
+          },
      },
      {
           tableName: 'orden_venta',
