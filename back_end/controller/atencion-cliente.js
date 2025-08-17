@@ -11,6 +11,7 @@ import { Sequelize, DataTypes, Op, where, fn, col } from 'sequelize';
 import { PreguntaAsistenteSchema } from '../models/preguntas-asistente.js';
 import { RespuestaAsistenteSchema } from '../models/respuesta-asistente.js';
 import { CategoriaSchema } from '../models/categoria.js';
+import { HistorialConversacionSchema } from '../models/historial-conversacion.js';
 
 export class AtencionClienteController {
      detectIntent = async (
@@ -125,6 +126,15 @@ export class AtencionClienteController {
                     infoAsistente,
                     esInicioConversacion,
                } = req.body;
+
+               const datosMensaje = {
+                    sesion: sessionID,
+                    id_negocio: infoAsistente.id_negocio,
+                    remitente: 'cliente',
+                    mensaje: consultaUsuario,
+                    fecha_mensaje: new Date(),
+               };
+               await this.registrarMensaje(datosMensaje);
                const respuestaBOT = await this.detectIntent(
                     'es',
                     consultaUsuario,
@@ -132,7 +142,14 @@ export class AtencionClienteController {
                     infoAsistente,
                     esInicioConversacion // esto es importante
                );
-
+               const datosRespuesta = {
+                    sesion: sessionID,
+                    id_negocio: infoAsistente.id_negocio,
+                    remitente: 'asistente',
+                    mensaje: respuestaBOT.response,
+                    fecha_mensaje: new Date(),
+               };
+               await this.registrarMensaje(datosRespuesta);
                return res.json({
                     type: 'success',
                     message: 'consulta exitosa',
@@ -410,5 +427,25 @@ export class AtencionClienteController {
           await Promise.all(
                requests.map((r) => client.createSessionEntityType(r))
           );
+     }
+
+     async registrarMensaje(infoMensaje) {
+          try {
+               let ultimoRegistro = await HistorialConversacionSchema.findOne({
+                    order: [['id_historial_conversacion', 'DESC']],
+               });
+               if (ultimoRegistro) {
+                    infoMensaje['id_historial_conversacion'] =
+                         ultimoRegistro.id_historial_conversacion + 1;
+               } else {
+                    infoMensaje['id_historial_conversacion'] = 1;
+               }
+
+               await HistorialConversacionSchema.create(infoMensaje);
+          } catch (error) {
+               console.error(
+                    `### Ocurrio un error al registrar el mensaje, info error : ${error} ;;;; informacion del mensaje : ${infoMensaje} ;;;;`
+               );
+          }
      }
 }

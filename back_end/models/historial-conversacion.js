@@ -1,15 +1,15 @@
 import { Sequelize, DataTypes, Op, where } from 'sequelize';
 import { sequelize } from '../config/database.js';
 
-export const CategoriaSchema = sequelize.define(
-     'Categoria',
+export const HistorialConversacionSchema = sequelize.define(
+     'HistorialConversacion',
      {
-          id_categoria: {
+          id_historial_conversacion: {
                type: DataTypes.INTEGER,
                primaryKey: true,
                autoIncrement: true,
           },
-          nombre_categoria: {
+          sesion: {
                type: DataTypes.STRING,
                allowNull: false,
           },
@@ -17,19 +17,23 @@ export const CategoriaSchema = sequelize.define(
                type: DataTypes.INTEGER,
                allowNull: false,
           },
-          nombre_negocio: {
-               type: DataTypes.STRING,
+          remitente: {
+               type: DataTypes.ENUM('cliente', 'asistente'),
                allowNull: false,
           },
-          descripcion: {
+          mensaje: {
                type: DataTypes.TEXT,
-               defaultValue: '',
+               allowNull: false,
+          },
+          fecha_mensaje: {
+               type: DataTypes.DATE,
+               allowNull: false,
           },
      },
      {
-          tableName: 'categoria',
+          tableName: 'historial_conversacion',
           timestamps: false,
      }
 );
 
-export class CategoriaModel {}
+export class HistorialConversacionModel {}
