@@ -40,6 +40,11 @@ import { TiendaModel, TiendaSchema } from './models/tienda.js';
 import './models/relaciones-tablas.js';
 import { OrdenVentaModel, OrdenVentaSchema } from './models/orden_venta.js';
 import { createOrdenVentaRouter } from './routes/orden_venta.js';
+import { createHistorialConversacionRouter } from './routes/historial-conversacion.js';
+import {
+     HistorialConversacionModel,
+     HistorialConversacionSchema,
+} from './models/historial-conversacion.js';
 
 const PORT = process.env.API_PORT;
 const app = express();
@@ -143,6 +148,15 @@ app.use('/tienda', createTiendaRouter(TiendaModel, TiendaSchema));
 app.use(
      '/orden-venta',
      createOrdenVentaRouter(OrdenVentaModel, OrdenVentaSchema)
+);
+
+//consultas con respecto a las conversaciones realizadas
+app.use(
+     '/historial-conversacion',
+     createHistorialConversacionRouter(
+          HistorialConversacionModel,
+          HistorialConversacionSchema
+     )
 );
 
 //Servidor escuchando la conexion

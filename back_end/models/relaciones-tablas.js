@@ -1,5 +1,6 @@
 import { AsistenteSchema } from './asistente.js';
 import { CategoriaSchema } from './categoria.js';
+import { HistorialConversacionSchema } from './historial-conversacion.js';
 import { NegocioSchema } from './negocios.js';
 import { OrdenVentaSchema } from './orden_venta.js';
 import { OrdenVentaArticuloSchema } from './orden_venta_articulo.js';
@@ -44,4 +45,14 @@ OrdenVentaSchema.hasMany(OrdenVentaArticuloSchema, {
 OrdenVentaArticuloSchema.belongsTo(OrdenVentaSchema, {
      foreignKey: 'id_orden_venta',
      as: 'orden',
+});
+
+HistorialConversacionSchema.belongsTo(NegocioSchema, {
+     foreignKey: 'id_negocio',
+     as: 'negocio',
+});
+
+NegocioSchema.hasMany(HistorialConversacionSchema, {
+     foreignKey: 'id_negocio',
+     as: 'conversaciones',
 });
