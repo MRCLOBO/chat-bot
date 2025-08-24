@@ -29,6 +29,16 @@ export const HistorialConversacionSchema = sequelize.define(
                type: DataTypes.DATE,
                allowNull: false,
           },
+          estado: {
+               type: DataTypes.ENUM(
+                    'En curso',
+                    'Pendiente a asistir',
+                    'Finalizado',
+                    'Asistido'
+               ),
+               allowNull: false,
+               defaultValue: 'En curso',
+          },
      },
      {
           tableName: 'historial_conversacion',

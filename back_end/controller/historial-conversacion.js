@@ -193,6 +193,7 @@ export class HistorialConversacionController {
                          nombre_negocio:
                               conversacionesAgrupadas[id][0].negocio
                                    .nombre_negocio,
+                         estado: conversacionesAgrupadas[id][0].estado,
                     })
                );
                return res.status(200).json(conversaciones);
