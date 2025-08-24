@@ -118,14 +118,14 @@ export class AtencionClienteController {
                response: result.fulfillmentText,
           };
      };
-     consulta = async (req, res) => {
+     consulta = async (consulta) => {
           try {
                const {
                     sessionID,
                     consultaUsuario,
                     infoAsistente,
                     esInicioConversacion,
-               } = req.body;
+               } = consulta;
 
                const datosMensaje = {
                     sesion: sessionID,
@@ -150,21 +150,21 @@ export class AtencionClienteController {
                     fecha_mensaje: new Date(),
                };
                await this.registrarMensaje(datosRespuesta);
-               return res.json({
+               return {
                     type: 'success',
                     message: 'consulta exitosa',
                     respuestaBOT: respuestaBOT.response,
-               });
+               };
           } catch (error) {
                console.log(
                     '###Ocurrió un error al hacer la consulta al chatbot###',
                     error,
                     '################################'
                );
-               return res.json({
+               return {
                     type: 'error',
                     message: 'Ocurrió un error en el servidor, por favor intentelo de nuevo más tarde',
-               });
+               };
           }
      };
 
@@ -449,3 +449,4 @@ export class AtencionClienteController {
           }
      }
 }
+export const atencionClienteController = new AtencionClienteController();

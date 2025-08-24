@@ -45,11 +45,34 @@ import {
      HistorialConversacionModel,
      HistorialConversacionSchema,
 } from './models/historial-conversacion.js';
+const dotenv = require('dotenv').config();
+import http from 'http';
+import { Server } from 'socket.io';
+// Importamos nuestra configuración de sockets
+import registerSockets from './socket.js';
+import { AtencionClienteController } from './controller/atencion-cliente.js';
 
 const PORT = process.env.API_PORT;
 const app = express();
 app.disable('x-powered-by');
 app.use(corsMiddleware());
+const server = http.createServer(app);
+
+const apiUrls = process.env.API_URLS.split(',');
+const ACCEPTED_ORIGINS = apiUrls;
+const atencionClienteController = new AtencionClienteController();
+// Socket.io en el mismo server HTTP
+const io = new Server(server, {
+     cors: {
+          origin: ACCEPTED_ORIGINS, // tu Angular
+          methods: ['GET', 'POST'],
+     },
+});
+
+// 🔑 Inyección: pasamos detectIntent con el this bindeado
+registerSockets(io, {
+     controller: atencionClienteController,
+});
 
 const upload = multer({
      storage: multer.diskStorage({
@@ -83,6 +106,9 @@ sequelize
      .sync({ force: false })
      .then(() => console.log('✅ Tablas sincronizadas'))
      .catch((error) => console.error('❌ Error al sincronizar tablas:', error));
+
+// (Tus rutas HTTP pueden seguir existiendo)
+app.get('/health', (_, res) => res.json({ ok: true }));
 
 //Para saber cada vez que se reciba una solicitud en la API
 app.use((req, res, next) => {
@@ -160,8 +186,12 @@ app.use(
 );
 
 //Servidor escuchando la conexion
-app.listen(PORT, () => {
-     console.log(
-          `El servidor esta escuchando las conexiones en http://localhost:${PORT}`
-     );
+// app.listen(PORT, () => {
+//      console.log(
+//           `El servidor esta escuchando las conexiones en http://localhost:${PORT}`
+//      );
+// });
+// 4. Iniciar servidor
+server.listen(PORT, () => {
+     console.log(`Servidor corriendo en http://localhost:${PORT}`);
 });
