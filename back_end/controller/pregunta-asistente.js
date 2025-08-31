@@ -64,6 +64,7 @@ export class PreguntaAsistenteController {
 
                const trainingPhrases = [
                     {
+                         type: 'EXAMPLE',
                          parts: this.generarParts(
                               nuevaPregunta.pregunta,
                               valoresEjemplo
@@ -75,6 +76,7 @@ export class PreguntaAsistenteController {
                                    typeof s === 'string' && s.trim().length > 0
                          )
                          .map((s) => ({
+                              type: 'EXAMPLE',
                               parts: this.generarParts(s, valoresEjemplo),
                          })),
                ];
@@ -504,6 +506,7 @@ export class PreguntaAsistenteController {
 
           return JSON.parse(negocio.api_key);
      }
+
      async actualizarIntentDesdePregunta({
           displayName,
           trainingParts,

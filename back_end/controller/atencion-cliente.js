@@ -179,6 +179,10 @@ export class AtencionClienteController {
                const nombreProducto = parametros?.productoNombre;
                const precioProducto = Number(parametros?.productoPrecio);
                const categoriaProducto = parametros?.productoCategoria;
+               console.log(
+                    '## informacion de la consulta ##',
+                    req.body.queryResult
+               );
                const negocio = await NegocioSchema.findOne({
                     where: { id_negocio },
                });
@@ -193,7 +197,7 @@ export class AtencionClienteController {
                 * Si mi intencion no es la generica buscara la respuesta en base a este, sino, lo buscara por pregunta ya que es un intento personalizado
                 */
                try {
-                    if (intencion !== 'Default Fallback Intent') {
+                    if (intencion !== 'Consultar Producto') {
                          const pregunta = await PreguntaAsistenteSchema.findOne(
                               {
                                    where: { intencion: intencion },
