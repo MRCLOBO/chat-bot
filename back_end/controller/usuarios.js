@@ -12,6 +12,20 @@ export class UsuarioController {
           return res.status(200).json(usuarios);
      };
 
+     verificarUsuarios = async (req, res) => {
+          let existe = false;
+          // Se busca al usuario por su id y id_negocio por la primary key compuesta
+          const usuario = await this.usuarioSchema.findOne({
+               where: {
+                    rol: 'admin',
+               },
+          });
+          if (usuario) {
+               existe = true;
+          }
+          return res.status(200).json(existe);
+     };
+
      create = async (req, res) => {
           try {
                const nuevoUsuario = req.body;

@@ -15,5 +15,7 @@ export const createUsuariosrouter = (UsuarioModel, usuarioSchema) => {
 
      usuariosRouter.post('/login', usuarioController.login);
 
+     usuariosRouter.get('/vu', usuarioController.verificarUsuarios);
+
      return usuariosRouter;
 };
