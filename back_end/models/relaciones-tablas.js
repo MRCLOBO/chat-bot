@@ -1,3 +1,4 @@
+import { AlumnoSchema } from './alumno.js';
 import { AsistenteSchema } from './asistente.js';
 import { CategoriaSchema } from './categoria.js';
 import { HistorialConversacionSchema } from './historial-conversacion.js';
@@ -55,4 +56,14 @@ HistorialConversacionSchema.belongsTo(NegocioSchema, {
 NegocioSchema.hasMany(HistorialConversacionSchema, {
      foreignKey: 'id_negocio',
      as: 'conversaciones',
+});
+
+AlumnoSchema.belongsTo(NegocioSchema, {
+     foreignKey: 'id_negocio',
+     as: 'negocio',
+});
+
+NegocioSchema.hasMany(AlumnoSchema, {
+     foreignKey: 'id_negocio',
+     as: 'alumno',
 });
