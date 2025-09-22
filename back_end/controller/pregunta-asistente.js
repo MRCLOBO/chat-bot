@@ -55,13 +55,6 @@ export class PreguntaAsistenteController {
                );
                const PROJECT_ID = CREDENTIALS.project_id;
 
-               // Generar contextsOut automáticamente desde la respuesta
-               const contextsOut = this.generarOutputContextsDesdeRespuesta(
-                    nuevaPregunta.respuesta,
-                    nuevaPregunta.intencion,
-                    PROJECT_ID
-               );
-
                const trainingPhrases = [
                     {
                          type: 'EXAMPLE',
@@ -86,9 +79,11 @@ export class PreguntaAsistenteController {
                     trainingPhrases: trainingPhrases,
                     respuesta: nuevaPregunta.respuesta,
                     contextsIn: nuevaPregunta.contexto_entrada || [],
-                    contextsOut: contextsOut,
+                    contextsOut: nuevaPregunta.contexto_salida || [],
+                    // contextsOut: contextsOut,
                     webhook: nuevaPregunta.webhook,
                     id_negocio: nuevaPregunta.id_negocio,
+                    valorContextoSalida: nuevaPregunta.valor_respuesta,
                });
                const respuestaBD = await this.preguntaAsistenteSchema.create(
                     nuevaPregunta
@@ -277,30 +272,34 @@ export class PreguntaAsistenteController {
                );
                const PROJECT_ID = CREDENTIALS.project_id;
 
-               // 6. Generar los contextos de salida desde la respuesta
-               const contextsOut = this.generarOutputContextsDesdeRespuesta(
-                    nuevaPregunta.respuesta,
-                    nuevaPregunta.intencion,
-                    PROJECT_ID
-               );
-
                // 7. Generar las trainingParts
-               const sinonimosParts = (nuevaPregunta.sinonimos || [])
-                    .filter((s) => typeof s === 'string' && s.trim().length > 0)
-                    .map((s) => this.generarParts(s, valoresEjemplo));
 
-               const parts = [
-                    this.generarParts(nuevaPregunta.pregunta, valoresEjemplo),
-                    ...sinonimosParts,
-               ].flat();
-
+               const trainingPhrases = [
+                    {
+                         type: 'EXAMPLE',
+                         parts: this.generarParts(
+                              nuevaPregunta.pregunta,
+                              valoresEjemplo
+                         ),
+                    },
+                    ...(nuevaPregunta.sinonimos || [])
+                         .filter(
+                              (s) =>
+                                   typeof s === 'string' && s.trim().length > 0
+                         )
+                         .map((s) => ({
+                              type: 'EXAMPLE',
+                              parts: this.generarParts(s, valoresEjemplo),
+                         })),
+               ];
                // 8. Actualizar el intent en Dialogflow
                await this.actualizarIntentDesdePregunta({
                     displayName: nuevaPregunta.intencion,
-                    trainingParts: parts,
+                    trainingPhrases: trainingPhrases,
                     respuesta: nuevaPregunta.respuesta,
                     contextsIn: nuevaPregunta.contexto_entrada || [],
-                    contextsOut: contextsOut,
+                    // contextsOut: contextsOut,
+                    contextsOut: nuevaPregunta.contexto_salida || [],
                     webhook: nuevaPregunta.webhook,
                     id_negocio: nuevaPregunta.id_negocio,
                });
@@ -430,6 +429,7 @@ export class PreguntaAsistenteController {
           contextsOut,
           webhook,
           id_negocio,
+          valorContextoSalida,
      }) {
           const configAgente = await NegocioSchema.findOne({
                where: { id_negocio },
@@ -470,7 +470,10 @@ export class PreguntaAsistenteController {
                          (ctx) =>
                               `projects/${CREDENTIALS.project_id}/agent/sessions/-/contexts/${ctx}`
                     ),
-                    outputContexts: contextsOut,
+                    outputContexts: contextsOut.map((ctx) => ({
+                         name: `projects/${CREDENTIALS.project_id}/agent/sessions/-/contexts/${ctx}`,
+                         lifespanCount: 25, // puedes ajustar esto
+                    })),
                     webhookState: webhook
                          ? 'WEBHOOK_STATE_ENABLED'
                          : 'WEBHOOK_STATE_DISABLED',
@@ -486,7 +489,7 @@ export class PreguntaAsistenteController {
           return variables.map((variable) => {
                return {
                     name: `projects/${projectId}/agent/sessions/-/contexts/${variable}`,
-                    lifespanCount: 5,
+                    lifespanCount: 25,
                     parameters: {
                          [variable]: '',
                     },
@@ -509,13 +512,14 @@ export class PreguntaAsistenteController {
 
      async actualizarIntentDesdePregunta({
           displayName,
-          trainingParts,
+          trainingPhrases,
           respuesta,
           contextsIn = [],
           contextsOut = [],
           webhook,
           id_negocio,
      }) {
+          console.log(trainingPhrases);
           const configAgente = await NegocioSchema.findOne({
                where: { id_negocio },
           });
@@ -544,21 +548,22 @@ export class PreguntaAsistenteController {
           const intent = intents.find((i) => i.displayName === displayName);
           if (!intent) throw new Error(`Intent ${displayName} no encontrado`);
 
-          intent.trainingPhrases = [
-               {
-                    type: 'EXAMPLE',
-                    parts: trainingParts,
-               },
-          ];
+          // 👇 Aseguramos mismo formato que en create
+          intent.trainingPhrases = trainingPhrases;
           intent.messages = [
                {
                     text: { text: [respuesta] },
                },
           ];
           intent.inputContextNames = contextsIn.map(
-               (ctx) => `${projectPath}/contexts/${ctx}`
+               (ctx) =>
+                    `projects/${CREDENTIALS.project_id}/agent/sessions/-/contexts/${ctx}`
           );
-          intent.outputContexts = contextsOut;
+
+          intent.outputContexts = contextsOut.map((ctx) => ({
+               name: `projects/${CREDENTIALS.project_id}/agent/sessions/-/contexts/${ctx}`,
+               lifespanCount: 25,
+          }));
           intent.webhookState = webhook
                ? 'WEBHOOK_STATE_ENABLED'
                : 'WEBHOOK_STATE_DISABLED';

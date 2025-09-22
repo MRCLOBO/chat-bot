@@ -60,7 +60,7 @@ export class AlumnoController {
                if (campoOrden && tipoOrden) {
                     opcionesConsulta.order = [[campoOrden, tipoOrden]];
                }
-               const alumnos = await this.alumnosSchema.findAll({
+               const alumnos = await this.alumnoSchema.findAll({
                     ...opcionesConsulta,
                     include: [
                          {
@@ -111,34 +111,34 @@ export class AlumnoController {
           return filtrosLimpios;
      }
 
-     async getAsistente(filtros) {
+     async getAlumno(filtros) {
           try {
-               // Se busca el asistente por su id y id_negocio por la primary key compuesta
-               const asistente = await this.asistenteSchema.findOne({
+               // Se busca el alumno por su id y id_negocio por la primary key compuesta
+               const alumno = await this.alumnoSchema.findOne({
                     where: {
-                         id_asistente: filtros.id_asistente,
+                         id_alumno: filtros.id_alumno,
                     },
                });
-               if (!asistente)
+               if (!alumno)
                     return {
                          type: 'error',
-                         message: 'Asistente no encontrado',
+                         message: 'Alumno no encontrado',
                     };
-               return asistente;
+               return alumno;
           } catch (error) {
                return res.status(200).json({
                     type: 'error',
-                    message: `Asistente no encontrado`,
+                    message: `Alumno no encontrado`,
                });
           }
      }
      async obtenerUltimoID() {
           try {
-               const ultimoRegistro = await this.asistenteSchema.findOne({
-                    order: [['id_asistente', 'DESC']],
+               const ultimoRegistro = await this.alumnoSchema.findOne({
+                    order: [['id_alumno', 'DESC']],
                });
                if (ultimoRegistro) {
-                    return ultimoRegistro.id_asistente + 1;
+                    return ultimoRegistro.id_alumno + 1;
                } else {
                     return 1;
                }
@@ -165,13 +165,13 @@ export class AlumnoController {
      }
      async existeNombre(nombre, id_negocio) {
           try {
-               const asistente = await this.asistenteSchema.findOne({
+               const alumno = await this.alumnoSchema.findOne({
                     where: {
-                         nombre_asistente: nombre,
+                         nombre_alumno: nombre,
                          id_negocio: id_negocio,
                     },
                });
-               if (asistente) {
+               if (alumno) {
                     return true;
                } else {
                     return false;

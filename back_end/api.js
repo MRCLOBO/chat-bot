@@ -51,6 +51,8 @@ import { Server } from 'socket.io';
 // Importamos nuestra configuración de sockets
 import registerSockets from './socket.js';
 import { AtencionClienteController } from './controller/atencion-cliente.js';
+import { createAlumnoRouter } from './routes/alumno.js';
+import { AlumnoModel, AlumnoSchema } from './models/alumno.js';
 
 const PORT = process.env.API_PORT;
 const app = express();
@@ -184,6 +186,9 @@ app.use(
           HistorialConversacionSchema
      )
 );
+
+//consultas con respecto a las conversaciones realizadas
+app.use('/alumno', createAlumnoRouter(AlumnoModel, AlumnoSchema));
 
 //Servidor escuchando la conexion
 // app.listen(PORT, () => {

@@ -12,6 +12,7 @@ import { PreguntaAsistenteSchema } from '../models/preguntas-asistente.js';
 import { RespuestaAsistenteSchema } from '../models/respuesta-asistente.js';
 import { CategoriaSchema } from '../models/categoria.js';
 import { HistorialConversacionSchema } from '../models/historial-conversacion.js';
+import { VariablePreguntaSchema } from '../models/variable-pregunta.js';
 
 export class AtencionClienteController {
      detectIntent = async (
@@ -176,11 +177,12 @@ export class AtencionClienteController {
                const intencion = req.body.queryResult.intent.displayName;
                let respuesta = '';
                const parametros = req.body.queryResult.parameters || {};
-               const nombreProducto = parametros?.productoNombre;
-               const precioProducto = Number(parametros?.productoPrecio);
-               const categoriaProducto = parametros?.productoCategoria;
+               // const nombreProducto = parametros?.productoNombre;
+               // const precioProducto = Number(parametros?.productoPrecio);
+               // const categoriaProducto = parametros?.productoCategoria;
+
                console.log(
-                    '## informacion de la consulta ##',
+                    'VALOR COMPLETO DE LA CONSULTA ',
                     req.body.queryResult
                );
                const negocio = await NegocioSchema.findOne({
@@ -197,94 +199,194 @@ export class AtencionClienteController {
                 * Si mi intencion no es la generica buscara la respuesta en base a este, sino, lo buscara por pregunta ya que es un intento personalizado
                 */
                try {
-                    if (intencion !== 'Consultar Producto') {
-                         const pregunta = await PreguntaAsistenteSchema.findOne(
-                              {
-                                   where: { intencion: intencion },
-                              }
-                         );
+                    const pregunta = await PreguntaAsistenteSchema.findOne({
+                         where: { intencion: intencion },
+                    });
 
-                         if (!pregunta) {
-                              return res.json({
-                                   fulfillmentText:
-                                        'Lo siento, no entendi muy bien tu consulta. Me lo podrias especificar, por favor.',
-                              });
-                         }
-                         let producto;
-                         const where = {
-                              id_negocio: infoAsistente.id_negocio, // obligatorio
-                         };
-
-                         if (nombreProducto) {
-                              where.nombre_producto = {
-                                   [Op.iLike]: `%${nombreProducto}%`,
-                              };
-                         }
-
-                         if (precioProducto) {
-                              where.precio = precioProducto; // o podés convertir a número si viene como string
-                         }
-
-                         // Acá necesitás incluir la categoría relacionada y filtrar por su nombre
-                         const includeCategoria = {
-                              model: CategoriaSchema,
-                              as: 'categoria',
-                              attributes: ['nombre_categoria'],
-                              ...(categoriaProducto && {
-                                   where: {
-                                        nombre_categoria: {
-                                             [Op.iLike]: `%${categoriaProducto}%`,
-                                        },
-                                   },
-                              }),
-                         };
-
-                         if (
-                              nombreProducto ||
-                              categoriaProducto ||
-                              precioProducto
-                         ) {
-                              producto = await ProductoSchema.findOne({
-                                   where,
-                                   include: [includeCategoria],
-                                   raw: true,
-                              });
-
-                              if (!producto) {
-                                   return res.json({
-                                        fulfillmentText: `Lo siento, no tenemos el articulo que deseas.Si necesitas algun otro articulo puedes decirmelo'.`,
-                                   });
-                              }
-                              if (producto.cantidad < 1) {
-                                   return res.json({
-                                        fulfillmentText: `Lo siento, ya no tenemos stock de '${nombreProducto}' si necesitas algun otro articulo puedes decirmelo'.`,
-                                   });
-                              }
-                         }
-
-                         const datosNegocio = {
-                              productoNombre: producto?.nombre_producto,
-                              productoCategoria:
-                                   producto?.categoria?.nombre_categoria,
-                              productoPrecio: producto?.precio,
-                              productoCantidad: producto?.cantidad,
-                              nombreNegocio: negocio.nombre_negocio,
-                              direccionNegocio: negocio.direccion,
-                              correoNegocio: negocio.email,
-                              propietarioNegocio: negocio.propietario,
-                              telefonoNegocio: negocio.telefono,
-                         };
-                         respuesta = this.renderTemplate(
-                              pregunta.respuesta,
-                              datosNegocio
-                         );
+                    if (!pregunta) {
+                         return res.json({
+                              fulfillmentText:
+                                   'Lo siento, no entendi muy bien tu consulta. Me podrias especificar mas, por favor.',
+                         });
                     }
+
+                    // Buscar variables definidas para este negocio
+                    const variables = await VariablePreguntaSchema.findAll({
+                         where: { id_negocio },
+                    });
+
+                    const outputContexts = [];
+
+                    // Recorrer variables asociadas a la pregunta
+                    for (const v of variables) {
+                         if (
+                              pregunta.variables_pregunta.includes(
+                                   v.nombre_variable_pregunta
+                              )
+                         ) {
+                              let valor = null;
+                              // console.log(
+                              //      'CUMPLE LA CONDICION',
+                              //      v,
+                              //      ' PARAMETROS : ',
+                              //      parametros
+                              // );
+                              switch (v.tipo_respuesta) {
+                                   case 'sin_valor':
+                                        // Se deja nulo o vacío, se completará en otra interacción
+                                        valor = null;
+                                        break;
+
+                                   case 'valor_parametro':
+                                        // Si el usuario pasó el parámetro en esta consulta, lo usamos
+                                        // Ej: { cedulaCliente: "123456" }
+                                        valor =
+                                             parametros?.[
+                                                  v.nombre_variable_pregunta
+                                             ] ?? null;
+                                        break;
+
+                                   case 'valor_fijo':
+                                        // Se usa el valor que ya está en BD
+                                        valor = v.valor_respuesta;
+                                        break;
+                              }
+
+                              outputContexts.push({
+                                   name: `${req.body.session}/contexts/${v.nombre_variable_pregunta}`,
+                                   lifespanCount: 25,
+                                   parameters: {
+                                        [v.nombre_variable_pregunta]: valor,
+                                   },
+                              });
+                         }
+                    }
+
+                    const datosNegocio = {};
+
+                    // 2) Agregar variables de los contextos activos
+                    const inputContexts =
+                         req.body.queryResult.outputContexts || [];
+                    for (const ctx of inputContexts) {
+                         if (ctx.parameters) {
+                              for (const [key, value] of Object.entries(
+                                   ctx.parameters
+                              )) {
+                                   if (
+                                        value !== null &&
+                                        value !== undefined &&
+                                        value !== ''
+                                   ) {
+                                        datosNegocio[key] = value;
+                                   }
+                              }
+                         }
+                    }
+
+                    // console.log(
+                    //      '99999999999999      DATOS DEL NEGOCIO: ',
+                    //      datosNegocio,
+                    //      ' DATOS DE LA PREGUNTA :',
+                    //      pregunta,
+                    //      '99999999999999999999',
+                    //      'VALOR DE OUTPUT',
+                    //      outputContexts
+                    // );
+                    respuesta = this.renderTemplate(
+                         pregunta.respuesta,
+                         datosNegocio
+                    );
+
+                    // if (intencion !== 'Consultar Producto') {
+                    //      const pregunta = await PreguntaAsistenteSchema.findOne(
+                    //           {
+                    //                where: { intencion: intencion },
+                    //           }
+                    //      );
+
+                    //      if (!pregunta) {
+                    //           return res.json({
+                    //                fulfillmentText:
+                    //                     'Lo siento, no entendi muy bien tu consulta. Me lo podrias especificar, por favor.',
+                    //           });
+                    //      }
+                    //      let producto;
+                    //      const where = {
+                    //           id_negocio: infoAsistente.id_negocio, // obligatorio
+                    //      };
+
+                    //      if (nombreProducto) {
+                    //           where.nombre_producto = {
+                    //                [Op.iLike]: `%${nombreProducto}%`,
+                    //           };
+                    //      }
+
+                    //      if (precioProducto) {
+                    //           where.precio = precioProducto; // o podés convertir a número si viene como string
+                    //      }
+
+                    //      // Acá necesitás incluir la categoría relacionada y filtrar por su nombre
+                    //      const includeCategoria = {
+                    //           model: CategoriaSchema,
+                    //           as: 'categoria',
+                    //           attributes: ['nombre_categoria'],
+                    //           ...(categoriaProducto && {
+                    //                where: {
+                    //                     nombre_categoria: {
+                    //                          [Op.iLike]: `%${categoriaProducto}%`,
+                    //                     },
+                    //                },
+                    //           }),
+                    //      };
+
+                    //      if (
+                    //           nombreProducto ||
+                    //           categoriaProducto ||
+                    //           precioProducto
+                    //      ) {
+                    //           producto = await ProductoSchema.findOne({
+                    //                where,
+                    //                include: [includeCategoria],
+                    //                raw: true,
+                    //           });
+
+                    //           if (!producto) {
+                    //                return res.json({
+                    //                     fulfillmentText: `Lo siento, no tenemos el articulo que deseas.Si necesitas algun otro articulo puedes decirmelo'.`,
+                    //                });
+                    //           }
+                    //           if (producto.cantidad < 1) {
+                    //                return res.json({
+                    //                     fulfillmentText: `Lo siento, ya no tenemos stock de '${nombreProducto}' si necesitas algun otro articulo puedes decirmelo'.`,
+                    //                });
+                    //           }
+                    //      }
+
+                    //      const datosNegocio = {
+                    //           productoNombre: producto?.nombre_producto,
+                    //           productoCategoria:
+                    //                producto?.categoria?.nombre_categoria,
+                    //           productoPrecio: producto?.precio,
+                    //           productoCantidad: producto?.cantidad,
+                    //           nombreNegocio: negocio.nombre_negocio,
+                    //           direccionNegocio: negocio.direccion,
+                    //           correoNegocio: negocio.email,
+                    //           propietarioNegocio: negocio.propietario,
+                    //           telefonoNegocio: negocio.telefono,
+                    //      };
+                    //      respuesta = this.renderTemplate(
+                    //           pregunta.respuesta,
+                    //           datosNegocio
+                    //      );
+                    // }
                     if (intencion === 'Default Fallback Intent') {
                          respuesta = `Disculpa, no entendi muy bien tu consulta ¿Podrias ser mas especifico?`;
                     }
 
                     return res.json({
                          fulfillmentText: respuesta,
+
+                         outputContexts,
                     });
                } catch (error) {
                     console.error(

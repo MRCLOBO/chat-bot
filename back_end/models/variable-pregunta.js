@@ -22,6 +22,16 @@ export const VariablePreguntaSchema = sequelize.define(
                type: DataTypes.INTEGER,
                allowNull: false,
           },
+          tipo_respuesta: {
+               type: DataTypes.STRING,
+               allowNull: false,
+               defaultValue: 'sin_valor',
+          },
+          valor_respuesta: {
+               type: DataTypes.STRING,
+               allowNull: true,
+               defaultValue: null,
+          },
      },
      {
           tableName: 'variable-pregunta',
