@@ -102,6 +102,7 @@ export class PreguntaAsistenteController {
             });
         }
     };
+
     getBy = async (req, res) => {
         try {
             const filtros = await this.limpiarCampos(req.body);
@@ -468,7 +469,28 @@ export class PreguntaAsistenteController {
             intent: {
                 displayName: displayName,
                 trainingPhrases: trainingPhrases,
+                /**
+ * 
+NUEVA IMPLEMENTACION PARA PREGUNTAR POR LAS VARIABLES DE LA PREGUNTA  
+                parameters: [
+                    {
+                      displayName: "ciudad",
+                      value: "$ciudad",
+                      entityType: "@ciudad",
+                      mandatory: true,
+                      prompts: ["¿En qué ciudad estás interesado?"],
+                    },
+                    {
+                      displayName: "fecha",
+                      value: "$fecha",
+                      entityType: "@sys.date",
+                      mandatory: true,
+                      prompts: ["¿Para qué fecha necesitas la información?"],
+                    },
+                    // Puedes agregar más parámetros aquí
+                  ],
 
+*/
                 messages: [
                     {
                         text: {
