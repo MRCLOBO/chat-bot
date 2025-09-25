@@ -487,13 +487,14 @@ export class PreguntaAsistenteController {
                const valores = {
                     displayName: variables.nombre_variable_pregunta,
                     value: `$${variables.nombre_variable_pregunta}`,
-                    entityType: `@${variables.nombre_variable_pregunta}`,
+                    entityTypeDisplayName: `@${variables.nombre_variable_pregunta}`,
                     mandatory: true,
                     prompts: [variables.pregunta],
                };
 
                preguntaDeVariables.push(valores);
           }
+          console.log(preguntaDeVariables);
           const request = {
                parent: projectPath,
                intent: {
@@ -605,7 +606,7 @@ export class PreguntaAsistenteController {
                const valores = {
                     displayName: variables.nombre_variable_pregunta,
                     value: `$${variables.nombre_variable_pregunta}`,
-                    entityType: `@${variables.nombre_variable_pregunta}`,
+                    entityTypeDisplayName: `@${variables.nombre_variable_pregunta}`,
                     mandatory: true,
                     prompts: [variables.pregunta],
                };
@@ -650,6 +651,7 @@ export class PreguntaAsistenteController {
                updateMask: {
                     paths: [
                          'training_phrases',
+                         'parameters',
                          'messages',
                          'input_context_names',
                          'output_contexts',
