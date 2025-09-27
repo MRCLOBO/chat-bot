@@ -177,11 +177,11 @@ export class AtencionClienteController {
             const intencion = req.body.queryResult.intent.displayName;
             let respuesta = "";
             const parametros = req.body.queryResult.parameters || {};
+            console.log("### PARAMETROS : ", parametros);
             // const nombreProducto = parametros?.productoNombre;
             // const precioProducto = Number(parametros?.productoPrecio);
             // const categoriaProducto = parametros?.productoCategoria;
 
-            console.log("VALOR COMPLETO DE LA CONSULTA ", req.body.queryResult);
             const negocio = await NegocioSchema.findOne({
                 where: { id_negocio },
             });
