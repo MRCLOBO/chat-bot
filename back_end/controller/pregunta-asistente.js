@@ -24,13 +24,60 @@ export class PreguntaAsistenteController {
                nuevaPregunta['id_pregunta'] = await this.obtenerUltimoID();
 
                const variablesUtilizadas = [];
+               const valoresEjemplo = {};
                // 2. Extraer variables de la pregunta
-               const variables = this.extraerVariablesDeTexto(
-                    nuevaPregunta.pregunta
-               );
+
+               // 🔹 Función auxiliar para procesar variables de cualquier texto
+               const procesarVariablesDeTexto = async (texto) => {
+                    const variables = this.extraerVariablesDeTexto(texto);
+                    for (const nombreVariable of variables) {
+                         // Evitar volver a buscar la misma variable
+                         if (
+                              !variablesUtilizadas.find(
+                                   (v) =>
+                                        v.nombre_variable_pregunta ===
+                                        nombreVariable
+                              )
+                         ) {
+                              const variable =
+                                   await this.variablePreguntaSchema.findOne({
+                                        where: {
+                                             nombre_variable_pregunta:
+                                                  nombreVariable,
+                                             id_negocio:
+                                                  nuevaPregunta.id_negocio,
+                                        },
+                                   });
+                              if (variable) {
+                                   variablesUtilizadas.push(variable);
+                                   if (
+                                        Array.isArray(variable.valores) &&
+                                        variable.valores.length > 0
+                                   ) {
+                                        valoresEjemplo[nombreVariable] =
+                                             variable.valores;
+                                   } else {
+                                        valoresEjemplo[nombreVariable] =
+                                             nombreVariable; // fallback
+                                   }
+                              }
+                         }
+                    }
+               };
+
+               // 🔹 Procesar la pregunta principal
+               await procesarVariablesDeTexto(nuevaPregunta.pregunta);
+
+               // 🔹 Procesar sinónimos también
+               if (Array.isArray(nuevaPregunta.sinonimos)) {
+                    for (const s of nuevaPregunta.sinonimos) {
+                         if (typeof s === 'string' && s.trim().length > 0) {
+                              await procesarVariablesDeTexto(s);
+                         }
+                    }
+               }
 
                // 3. Buscar los valores de ejemplo de cada variable
-               const valoresEjemplo = {};
                for (const nombreVariable of variables) {
                     const variable = await this.variablePreguntaSchema.findOne({
                          where: {
@@ -247,30 +294,56 @@ export class PreguntaAsistenteController {
                delete filtros.id_pregunta;
 
                const variablesUtilizadas = [];
-               // 3. Extraer variables de la pregunta actualizada
-               const variables = this.extraerVariablesDeTexto(
-                    nuevaPregunta.pregunta
-               );
-
-               // 4. Buscar ejemplos para las variables
                const valoresEjemplo = {};
-               for (const nombreVariable of variables) {
-                    const variable = await this.variablePreguntaSchema.findOne({
-                         where: {
-                              nombre_variable_pregunta: nombreVariable,
-                              id_negocio: nuevaPregunta.id_negocio,
-                         },
-                    });
-                    variablesUtilizadas.push(variable);
+               // 2. Extraer variables de la pregunta
 
-                    if (
-                         variable &&
-                         Array.isArray(variable.valores) &&
-                         variable.valores.length > 0
-                    ) {
-                         valoresEjemplo[nombreVariable] = variable.valores;
-                    } else {
-                         valoresEjemplo[nombreVariable] = nombreVariable;
+               // 🔹 Función auxiliar para procesar variables de cualquier texto
+               const procesarVariablesDeTexto = async (texto) => {
+                    const variables = this.extraerVariablesDeTexto(texto);
+                    for (const nombreVariable of variables) {
+                         // Evitar volver a buscar la misma variable
+                         if (
+                              !variablesUtilizadas.find(
+                                   (v) =>
+                                        v.nombre_variable_pregunta ===
+                                        nombreVariable
+                              )
+                         ) {
+                              const variable =
+                                   await this.variablePreguntaSchema.findOne({
+                                        where: {
+                                             nombre_variable_pregunta:
+                                                  nombreVariable,
+                                             id_negocio:
+                                                  nuevaPregunta.id_negocio,
+                                        },
+                                   });
+                              if (variable) {
+                                   variablesUtilizadas.push(variable);
+                                   if (
+                                        Array.isArray(variable.valores) &&
+                                        variable.valores.length > 0
+                                   ) {
+                                        valoresEjemplo[nombreVariable] =
+                                             variable.valores;
+                                   } else {
+                                        valoresEjemplo[nombreVariable] =
+                                             nombreVariable; // fallback
+                                   }
+                              }
+                         }
+                    }
+               };
+
+               // 🔹 Procesar la pregunta principal
+               await procesarVariablesDeTexto(nuevaPregunta.pregunta);
+
+               // 🔹 Procesar sinónimos también
+               if (Array.isArray(nuevaPregunta.sinonimos)) {
+                    for (const s of nuevaPregunta.sinonimos) {
+                         if (typeof s === 'string' && s.trim().length > 0) {
+                              await procesarVariablesDeTexto(s);
+                         }
                     }
                }
 
@@ -494,35 +567,12 @@ export class PreguntaAsistenteController {
 
                preguntaDeVariables.push(valores);
           }
-          console.log(preguntaDeVariables);
           const request = {
                parent: projectPath,
                intent: {
                     displayName: displayName,
                     trainingPhrases: trainingPhrases,
                     parameters: preguntaDeVariables,
-                    /**
-                 * 
-                NUEVA IMPLEMENTACION PARA PREGUNTAR POR LAS VARIABLES DE LA PREGUNTA  
-                parameters: [
-                    {
-                      displayName: "ciudad",
-                      value: "$ciudad",
-                      entityType: "@ciudad",
-                      mandatory: true,
-                      prompts: ["¿En qué ciudad estás interesado?"],
-                    },
-                    {
-                      displayName: "fecha",
-                      value: "$fecha",
-                      entityType: "@sys.date",
-                      mandatory: true,
-                      prompts: ["¿Para qué fecha necesitas la información?"],
-                    },
-                    // Puedes agregar más parámetros aquí
-                  ],
-
-                */
                     messages: [
                          {
                               text: {
