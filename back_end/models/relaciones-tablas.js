@@ -1,6 +1,7 @@
 import { AlumnoSchema } from './alumno.js';
 import { AnhoCarreraSchema } from './anho_carrera.js';
 import { AsistenteSchema } from './asistente.js';
+import { CarreraSchema } from './carrera.js';
 import { CategoriaSchema } from './categoria.js';
 import { HistorialConversacionSchema } from './historial-conversacion.js';
 import { NegocioSchema } from './negocios.js';
@@ -79,7 +80,6 @@ NegocioSchema.hasMany(AnhoCarreraSchema, {
      foreignKey: 'id_negocio',
      as: 'anho_carrera',
 });
-
 TurnoCarreraSchema.belongsTo(NegocioSchema, {
      foreignKey: 'id_negocio',
      as: 'negocio',
@@ -88,4 +88,14 @@ TurnoCarreraSchema.belongsTo(NegocioSchema, {
 NegocioSchema.hasMany(TurnoCarreraSchema, {
      foreignKey: 'id_negocio',
      as: 'turno_carrera',
+});
+
+CarreraSchema.belongsTo(NegocioSchema, {
+     foreignKey: 'id_negocio',
+     as: 'negocio',
+});
+
+NegocioSchema.hasMany(CarreraSchema, {
+     foreignKey: 'id_negocio',
+     as: 'carrera',
 });

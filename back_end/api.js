@@ -60,6 +60,8 @@ import {
      TurnoCarreraSchema,
 } from './models/turno_carrera.js';
 import { createTurnoCarreraRouter } from './routes/turno_carrera.js';
+import { CarreraModel, CarreraSchema } from './models/carrera.js';
+import { createCarreraRouter } from './routes/carrera.js';
 
 const PORT = process.env.API_PORT;
 const app = express();
@@ -208,6 +210,9 @@ app.use(
      '/turno_carrera',
      createTurnoCarreraRouter(TurnoCarreraModel, TurnoCarreraSchema)
 );
+
+//consultas con respecto a las carreras registradas
+app.use('/carrera', createCarreraRouter(CarreraModel, CarreraSchema));
 
 //Servidor escuchando la conexion
 // app.listen(PORT, () => {
