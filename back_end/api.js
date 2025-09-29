@@ -53,6 +53,13 @@ import registerSockets from './socket.js';
 import { AtencionClienteController } from './controller/atencion-cliente.js';
 import { createAlumnoRouter } from './routes/alumno.js';
 import { AlumnoModel, AlumnoSchema } from './models/alumno.js';
+import { AnhoCarreraModel, AnhoCarreraSchema } from './models/anho_carrera.js';
+import { createAnhoCarreraRouter } from './routes/anho_carrera.js';
+import {
+     TurnoCarreraModel,
+     TurnoCarreraSchema,
+} from './models/turno_carrera.js';
+import { createTurnoCarreraRouter } from './routes/turno_carrera.js';
 
 const PORT = process.env.API_PORT;
 const app = express();
@@ -187,8 +194,20 @@ app.use(
      )
 );
 
-//consultas con respecto a las conversaciones realizadas
+//consultas con respecto a los alumnos registrados
 app.use('/alumno', createAlumnoRouter(AlumnoModel, AlumnoSchema));
+
+//consultas con respecto a los años registrados
+app.use(
+     '/anho_carrera',
+     createAnhoCarreraRouter(AnhoCarreraModel, AnhoCarreraSchema)
+);
+
+//consultas con respecto a los turnos registrados
+app.use(
+     '/turno_carrera',
+     createTurnoCarreraRouter(TurnoCarreraModel, TurnoCarreraSchema)
+);
 
 //Servidor escuchando la conexion
 // app.listen(PORT, () => {

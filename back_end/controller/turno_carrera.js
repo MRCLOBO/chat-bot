@@ -1,32 +1,28 @@
 import { Op, where, fn, col } from 'sequelize';
 import { NegocioSchema } from '../models/negocios.js';
 
-export class AlumnoController {
-     constructor(alumnoModel, alumnoSchema) {
-          this.alumnoModel = alumnoModel;
-          this.alumnoSchema = alumnoSchema;
+export class TurnoCarreraController {
+     constructor(turnoCarreraModel, turnoCarreraSchema) {
+          this.modelo = turnoCarreraModel;
+          this.schema = turnoCarreraSchema;
           this.NegocioSchema = new NegocioSchema();
      }
 
      create = async (req, res) => {
           try {
-               const nuevoAlumno = req.body;
-               nuevoAlumno['id_alumno'] = await this.obtenerUltimoID();
-               const negocioVinculado = await this.getNegocio(
-                    nuevoAlumno.id_negocio
-               );
-               nuevoAlumno['nombre_negocio'] =
-                    negocioVinculado.dataValues.nombre_negocio;
-               const respuestaBD = await this.alumnoSchema.create(nuevoAlumno);
+               const nuevo = req.body;
+               nuevo['id_turno_carrera'] = await this.obtenerUltimoID();
+
+               const respuestaBD = await this.schema.create(nuevo);
                return res.status(200).json({
                     type: 'success',
-                    message: 'Alumno registrado con exito!',
+                    message: 'Registrado con exito!',
                     bd: respuestaBD,
                });
           } catch (error) {
                res.status(500).json({
                     type: 'error',
-                    message: `Error al crear el alumno por el siguiente error: ${error}`,
+                    message: `Error al crear el registro por el siguiente error: ${error}`,
                });
                console.error(error);
           }
@@ -36,13 +32,13 @@ export class AlumnoController {
                const filtros = await this.limpiarCampos(req.body);
                const condiciones = [];
                // Filtro LIKE para 'nombre'
-               if (filtros.nombre_alumno) {
+               if (filtros.denominacion) {
                     condiciones.push({
-                         nombre_alumno: {
-                              [Op.like]: `%${filtros.nombre_alumno}%`,
+                         denominacion: {
+                              [Op.like]: `%${filtros.denominacion}%`,
                          },
                     });
-                    delete filtros.nombre_alumno;
+                    delete filtros.denominacion;
                }
                // Extraer los valores de ordenamiento y eliminarlos del objeto de filtros
                const campoOrden = filtros.orden;
@@ -60,7 +56,7 @@ export class AlumnoController {
                if (campoOrden && tipoOrden) {
                     opcionesConsulta.order = [[campoOrden, tipoOrden]];
                }
-               const alumnos = await this.alumnoSchema.findAll({
+               const anhos_carrera = await this.schema.findAll({
                     ...opcionesConsulta,
                     include: [
                          {
@@ -70,38 +66,38 @@ export class AlumnoController {
                          },
                     ],
                });
-               return res.status(200).json(alumnos);
+               return res.status(200).json(anhos_carrera);
           } catch (error) {
                res.status(500).json({
                     type: 'error',
-                    message: `Error al consultar los alumnos: ${error}`,
+                    message: `Error al consultar los datos registrados: ${error}`,
                });
           }
      };
 
      delete = async (req, res) => {
           try {
-               const alumno = await this.getAlumno(req.body);
-               await alumno.destroy();
-               res.json({ mensaje: 'Alumno eliminado correctamente' });
+               const registro = await this.getRegistro(req.body);
+               await registro.destroy();
+               res.json({ mensaje: 'Eliminado correctamente' });
           } catch (error) {
                console.error(error);
                res.status(500).json({
                     type: 'error',
-                    message: `Error al eliminar el alumno por el siguiente error: ${error}`,
+                    message: `Error al eliminar el registro por el siguiente error: ${error}`,
                });
           }
      };
 
      update = async (req, res) => {
-          const alumno = await this.getAlumno(req.body);
+          const registro = await this.getRegistro(req.body);
           const filtros = await this.limpiarCampos(req.body);
-          const resultado = await this.alumnoSchema.update(filtros, {
+          const resultado = await this.schema.update(filtros, {
                where: {
-                    id_alumno: alumno.id_alumno,
+                    id_turno_carrera: registro.id_turno_carrera,
                },
           });
-          return res.json({ type: 'success', message: 'Alumno modificado' });
+          return res.json({ type: 'success', message: 'Registro Modificado' });
      };
 
      async limpiarCampos(filtros) {
@@ -112,34 +108,34 @@ export class AlumnoController {
           return filtrosLimpios;
      }
 
-     async getAlumno(filtros) {
+     async getRegistro(filtros) {
           try {
-               // Se busca el alumno por su id y id_negocio por la primary key compuesta
-               const alumno = await this.alumnoSchema.findOne({
+               // Se busca el registro por su id y id_negocio por la primary key compuesta
+               const registro = await this.schema.findOne({
                     where: {
-                         id_alumno: filtros.id_alumno,
+                         id_turno_carrera: filtros.id_turno_carrera,
                     },
                });
-               if (!alumno)
+               if (!registro)
                     return {
                          type: 'error',
-                         message: 'Alumno no encontrado',
+                         message: 'Registro encontrado',
                     };
-               return alumno;
+               return registro;
           } catch (error) {
                return res.status(200).json({
                     type: 'error',
-                    message: `Alumno no encontrado`,
+                    message: `Registro no encontrado`,
                });
           }
      }
      async obtenerUltimoID() {
           try {
-               const ultimoRegistro = await this.alumnoSchema.findOne({
-                    order: [['id_alumno', 'DESC']],
+               const ultimoRegistro = await this.schema.findOne({
+                    order: [['id_turno_carrera', 'DESC']],
                });
                if (ultimoRegistro) {
-                    return ultimoRegistro.id_alumno + 1;
+                    return ultimoRegistro.id_turno_carrera + 1;
                } else {
                     return 1;
                }
@@ -161,26 +157,6 @@ export class AlumnoController {
                     type: 'error',
                     message: 'Error al recuperar la informacion del negocio',
                     error: error,
-               };
-          }
-     }
-     async existeNombre(nombre, id_negocio) {
-          try {
-               const alumno = await this.alumnoSchema.findOne({
-                    where: {
-                         nombre_alumno: nombre,
-                         id_negocio: id_negocio,
-                    },
-               });
-               if (alumno) {
-                    return true;
-               } else {
-                    return false;
-               }
-          } catch (error) {
-               return {
-                    type: 'error',
-                    message: 'Error al consultar si ya existe el nombre',
                };
           }
      }

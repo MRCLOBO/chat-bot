@@ -73,6 +73,7 @@ export class AsistenteController {
                          {
                               model: NegocioSchema,
                               as: 'negocio',
+                              attributes: { exclude: ['api_key'] },
                          },
                     ],
                });

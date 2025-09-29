@@ -75,6 +75,7 @@ export class RespuestaAsistenteController {
                               {
                                    model: NegocioSchema,
                                    as: 'negocio',
+                                   attributes: { exclude: ['api_key'] },
                               },
                          ],
                     });

@@ -80,6 +80,7 @@ export class HistorialConversacionController {
                          {
                               model: NegocioSchema,
                               as: 'negocio', // este alias debe coincidir con el de belongsTo
+                              attributes: { exclude: ['api_key'] },
                          },
                     ],
                };
@@ -169,6 +170,7 @@ export class HistorialConversacionController {
                          {
                               model: NegocioSchema,
                               as: 'negocio',
+                              attributes: { exclude: ['api_key'] },
                          },
                     ],
                };

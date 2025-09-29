@@ -16,7 +16,6 @@ export const AlumnoSchema = sequelize.define(
           id_negocio: {
                type: DataTypes.INTEGER,
                allowNull: false,
-               primaryKey: true,
           },
           ci: {
                type: DataTypes.STRING,

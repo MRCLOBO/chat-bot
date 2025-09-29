@@ -1,4 +1,5 @@
 import { AlumnoSchema } from './alumno.js';
+import { AnhoCarreraSchema } from './anho_carrera.js';
 import { AsistenteSchema } from './asistente.js';
 import { CategoriaSchema } from './categoria.js';
 import { HistorialConversacionSchema } from './historial-conversacion.js';
@@ -8,6 +9,7 @@ import { OrdenVentaArticuloSchema } from './orden_venta_articulo.js';
 import { PreguntaAsistenteSchema } from './preguntas-asistente.js';
 import { ProductoSchema } from './producto.js';
 import { RespuestaAsistenteSchema } from './respuesta-asistente.js';
+import { TurnoCarreraSchema } from './turno_carrera.js';
 
 // Aquí ya están definidos, entonces se puede relacionar sin error
 AsistenteSchema.belongsTo(NegocioSchema, {
@@ -66,4 +68,24 @@ AlumnoSchema.belongsTo(NegocioSchema, {
 NegocioSchema.hasMany(AlumnoSchema, {
      foreignKey: 'id_negocio',
      as: 'alumno',
+});
+
+AnhoCarreraSchema.belongsTo(NegocioSchema, {
+     foreignKey: 'id_negocio',
+     as: 'negocio',
+});
+
+NegocioSchema.hasMany(AnhoCarreraSchema, {
+     foreignKey: 'id_negocio',
+     as: 'anho_carrera',
+});
+
+TurnoCarreraSchema.belongsTo(NegocioSchema, {
+     foreignKey: 'id_negocio',
+     as: 'negocio',
+});
+
+NegocioSchema.hasMany(TurnoCarreraSchema, {
+     foreignKey: 'id_negocio',
+     as: 'turno_carrera',
 });

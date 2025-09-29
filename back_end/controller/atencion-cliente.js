@@ -186,7 +186,7 @@ export class AtencionClienteController {
                               const ciLimpio = value.replace(/\./g, '');
                               const datosAlumno = await AlumnoSchema.findOne({
                                    where: { id_negocio, ci: ciLimpio },
-                                   raw: true, // <-- esto hace que ya venga como objeto plano
+                                   raw: true,
                               });
 
                               if (datosAlumno) {
