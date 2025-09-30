@@ -3,6 +3,7 @@ import { AnhoCarreraSchema } from './anho_carrera.js';
 import { AsistenteSchema } from './asistente.js';
 import { CarreraSchema } from './carrera.js';
 import { CategoriaSchema } from './categoria.js';
+import { CursoSchema } from './curso.js';
 import { HistorialConversacionSchema } from './historial-conversacion.js';
 import { NegocioSchema } from './negocios.js';
 import { OrdenVentaSchema } from './orden_venta.js';
@@ -98,4 +99,44 @@ CarreraSchema.belongsTo(NegocioSchema, {
 NegocioSchema.hasMany(CarreraSchema, {
      foreignKey: 'id_negocio',
      as: 'carrera',
+});
+
+CursoSchema.belongsTo(NegocioSchema, {
+     foreignKey: 'id_negocio',
+     as: 'negocio',
+});
+
+NegocioSchema.hasMany(CursoSchema, {
+     foreignKey: 'id_negocio',
+     as: 'curso',
+});
+
+CursoSchema.belongsTo(AnhoCarreraSchema, {
+     foreignKey: 'id_anho',
+     as: 'anho',
+});
+
+AnhoCarreraSchema.hasMany(CursoSchema, {
+     foreignKey: 'id_anho',
+     as: 'curso',
+});
+
+CursoSchema.belongsTo(TurnoCarreraSchema, {
+     foreignKey: 'id_turno',
+     as: 'turno',
+});
+
+TurnoCarreraSchema.hasMany(CursoSchema, {
+     foreignKey: 'id_turno',
+     as: 'curso',
+});
+
+CursoSchema.belongsTo(CarreraSchema, {
+     foreignKey: 'id_carrera',
+     as: 'carrera',
+});
+
+TurnoCarreraSchema.hasMany(CursoSchema, {
+     foreignKey: 'id_carrera',
+     as: 'curso',
 });
