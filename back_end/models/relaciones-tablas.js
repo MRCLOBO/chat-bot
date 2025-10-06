@@ -113,7 +113,7 @@ NegocioSchema.hasMany(CursoSchema, {
 
 CursoSchema.belongsTo(AnhoCarreraSchema, {
      foreignKey: 'id_anho',
-     as: 'anho',
+     as: 'anho_carrera',
 });
 
 AnhoCarreraSchema.hasMany(CursoSchema, {
@@ -123,7 +123,7 @@ AnhoCarreraSchema.hasMany(CursoSchema, {
 
 CursoSchema.belongsTo(TurnoCarreraSchema, {
      foreignKey: 'id_turno',
-     as: 'turno',
+     as: 'turno_carrera',
 });
 
 TurnoCarreraSchema.hasMany(CursoSchema, {
@@ -136,7 +136,7 @@ CursoSchema.belongsTo(CarreraSchema, {
      as: 'carrera',
 });
 
-TurnoCarreraSchema.hasMany(CursoSchema, {
+CarreraSchema.hasMany(CursoSchema, {
      foreignKey: 'id_carrera',
      as: 'curso',
 });

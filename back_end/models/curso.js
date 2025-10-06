@@ -17,6 +17,10 @@ export const CursoSchema = sequelize.define(
                type: DataTypes.STRING,
                allowNull: false,
           },
+          id_negocio: {
+               type: DataTypes.INTEGER,
+               allowNull: false,
+          },
           id_carrera: {
                type: DataTypes.INTEGER,
                allowNull: false,
