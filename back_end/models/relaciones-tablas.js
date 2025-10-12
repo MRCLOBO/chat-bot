@@ -72,6 +72,16 @@ NegocioSchema.hasMany(AlumnoSchema, {
      as: 'alumno',
 });
 
+AlumnoSchema.belongsTo(CursoSchema, {
+     foreignKey: 'id_curso',
+     as: 'curso',
+});
+
+CursoSchema.hasMany(AlumnoSchema, {
+     foreignKey: 'id_curso',
+     as: 'alumno',
+});
+
 AnhoCarreraSchema.belongsTo(NegocioSchema, {
      foreignKey: 'id_negocio',
      as: 'negocio',

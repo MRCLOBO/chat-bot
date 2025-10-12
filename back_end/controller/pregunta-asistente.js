@@ -78,7 +78,7 @@ export class PreguntaAsistenteController {
                }
 
                // 3. Buscar los valores de ejemplo de cada variable
-               for (const nombreVariable of variables) {
+               for (const nombreVariable of variablesUtilizadas) {
                     const variable = await this.variablePreguntaSchema.findOne({
                          where: {
                               nombre_variable_pregunta: nombreVariable,

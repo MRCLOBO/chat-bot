@@ -14,6 +14,10 @@ import { CategoriaSchema } from '../models/categoria.js';
 import { HistorialConversacionSchema } from '../models/historial-conversacion.js';
 import { VariablePreguntaSchema } from '../models/variable-pregunta.js';
 import { AlumnoModel, AlumnoSchema } from '../models/alumno.js';
+import { TurnoCarreraSchema } from '../models/turno_carrera.js';
+import { CarreraSchema } from '../models/carrera.js';
+import { AnhoCarreraSchema } from '../models/anho_carrera.js';
+import { CursoSchema } from '../models/curso.js';
 
 export class AtencionClienteController {
      detectIntent = async (
@@ -178,7 +182,7 @@ export class AtencionClienteController {
                const intencion = req.body.queryResult.intent.displayName;
                let respuesta = '';
                const parametros = req.body.queryResult.parameters || {};
-               const outputContexts = [];
+               const outputContexts = req.body.queryResult.outputContexts;
 
                for (const [key, value] of Object.entries(parametros)) {
                     switch (key) {
@@ -186,15 +190,39 @@ export class AtencionClienteController {
                               const ciLimpio = value.replace(/\./g, '');
                               const datosAlumno = await AlumnoSchema.findOne({
                                    where: { id_negocio, ci: ciLimpio },
-                                   raw: true,
+                                   include: [
+                                        {
+                                             model: CursoSchema,
+                                             as: 'curso',
+                                             include: [
+                                                  {
+                                                       model: CarreraSchema,
+                                                       as: 'carrera',
+                                                  },
+                                                  {
+                                                       model: AnhoCarreraSchema,
+                                                       as: 'anho_carrera',
+                                                  },
+                                                  {
+                                                       model: TurnoCarreraSchema,
+                                                       as: 'turno_carrera',
+                                                  },
+                                             ],
+                                        },
+                                   ],
                               });
-
                               if (datosAlumno) {
                                    const datosAlumnoFormateado = {
                                         nombreAlumno: datosAlumno.nombre_alumno,
-                                        carreraAlumno: datosAlumno.carrera,
-                                        turnoAlumno: datosAlumno.turno,
-                                        anhoCursadoAlumno: datosAlumno.anho,
+                                        carreraAlumno:
+                                             datosAlumno.curso.carrera
+                                                  .nombre_carrera,
+                                        turnoAlumno:
+                                             datosAlumno.curso.turno_carrera
+                                                  .denominacion,
+                                        anhoCursadoAlumno:
+                                             datosAlumno.curso.anho_carrera
+                                                  .denominacion,
                                         ultimaCuotaPendienteAlumno:
                                              datosAlumno.ultima_cuota_pendiente,
                                         montoCuotaPendienteAlumno:
@@ -203,19 +231,195 @@ export class AtencionClienteController {
                                              datosAlumno.horas_capacitacion,
                                         horasExtensionAlumno:
                                              datosAlumno.horas_extension,
+                                        cursoAlumno:
+                                             datosAlumno.curso.nombre_curso,
+                                        cuotaCurso:
+                                             datosAlumno.curso.mensualidad,
+                                        matriculaCurso:
+                                             datosAlumno.curso.matricula,
                                    };
 
                                    for (const [campo, valor] of Object.entries(
                                         datosAlumnoFormateado
                                    )) {
-                                        outputContexts.push({
-                                             name: `${req.body.session}/contexts/${campo}`,
-                                             lifespanCount: 40,
-                                             parameters: {
-                                                  [campo]: valor,
-                                             },
-                                        });
+                                        this.sobreEscribirContexto(
+                                             outputContexts,
+                                             {
+                                                  name: `${req.body.session}/contexts/${campo}`,
+                                                  lifespanCount: 40,
+                                                  parameters: {
+                                                       [campo]: valor,
+                                                  },
+                                             }
+                                        );
                                    }
+                              }
+
+                              break;
+                         case 'carreraAlumno':
+                              const carreraUsuario = value
+                                   ?.toLowerCase()
+                                   .trim();
+
+                              const carreras = await CarreraSchema.findAll({
+                                   where: { id_negocio },
+                                   raw: true,
+                              });
+
+                              let carreraCoincidente = null;
+
+                              for (const carrera of carreras) {
+                                   const nombre =
+                                        carrera.nombre_carrera.toLowerCase();
+                                   const abreviatura =
+                                        carrera.abreviatura?.toLowerCase() ??
+                                        '';
+                                   const otros = (
+                                        carrera.otro_nombre || []
+                                   ).map((n) => n.toLowerCase());
+
+                                   if (
+                                        nombre.includes(carreraUsuario) ||
+                                        abreviatura.includes(carreraUsuario) ||
+                                        otros.some((n) =>
+                                             n.includes(carreraUsuario)
+                                        )
+                                   ) {
+                                        carreraCoincidente = carrera;
+                                        break;
+                                   }
+                              }
+
+                              if (carreraCoincidente) {
+                                   this.sobreEscribirContexto(outputContexts, {
+                                        name: `${req.body.session}/contexts/carreraAlumno`,
+                                        lifespanCount: 40,
+                                        parameters: {
+                                             carreraAlumno:
+                                                  carreraCoincidente.nombre_carrera,
+                                             idCarrera:
+                                                  carreraCoincidente.id_carrera,
+                                        },
+                                   });
+                                   this.sobreEscribirContexto(outputContexts, {
+                                        name: `${req.body.session}/contexts/idCarreraAlumno`,
+                                        lifespanCount: 40,
+                                        parameters: {
+                                             idCarreraAlumno:
+                                                  carreraCoincidente.id_carrera,
+                                        },
+                                   });
+                              }
+
+                              break;
+
+                         case 'turnoAlumno':
+                              const turnoUsuario = value?.toLowerCase().trim();
+
+                              const turnos = await TurnoCarreraSchema.findAll({
+                                   where: { id_negocio },
+                                   raw: true,
+                              });
+
+                              let turnoCoincidente = null;
+
+                              for (const turno of turnos) {
+                                   const nombre =
+                                        turno.denominacion.toLowerCase();
+                                   const abreviatura =
+                                        turno.abreviatura?.toLowerCase() ?? '';
+                                   const otros = (
+                                        turno.otra_denominacion || []
+                                   ).map((n) => n.toLowerCase());
+
+                                   if (
+                                        nombre.includes(turnoUsuario) ||
+                                        abreviatura.includes(turnoUsuario) ||
+                                        otros.some((n) =>
+                                             n.includes(turnoUsuario)
+                                        )
+                                   ) {
+                                        turnoCoincidente = turno;
+                                        break;
+                                   }
+                              }
+
+                              if (turnoCoincidente) {
+                                   this.sobreEscribirContexto(outputContexts, {
+                                        name: `${req.body.session}/contexts/turnoAlumno`,
+                                        lifespanCount: 40,
+                                        parameters: {
+                                             turnoAlumno:
+                                                  turnoCoincidente.denominacion,
+                                             idTurno: turnoCoincidente.id_turno_carrera,
+                                        },
+                                   });
+                                   this.sobreEscribirContexto(outputContexts, {
+                                        name: `${req.body.session}/contexts/idTurnoAlumno`,
+                                        lifespanCount: 40,
+                                        parameters: {
+                                             idTurnoAlumno:
+                                                  turnoCoincidente.id_turno_carrera,
+                                        },
+                                   });
+                              }
+
+                              break;
+
+                         case 'anhoCursadoAlumno':
+                              const anhoCursadoUsuario = value
+                                   ?.toLowerCase()
+                                   .trim();
+
+                              const anhosCursado =
+                                   await AnhoCarreraSchema.findAll({
+                                        where: { id_negocio },
+                                        raw: true,
+                                   });
+
+                              let anhoCursadoCoincidente = null;
+
+                              for (const anhoCursado of anhosCursado) {
+                                   const nombre =
+                                        anhoCursado.denominacion.toLowerCase();
+                                   const abreviatura =
+                                        anhoCursado.abreviatura?.toLowerCase() ??
+                                        '';
+                                   const otros = (
+                                        anhoCursado.otra_denominacion || []
+                                   ).map((n) => n.toLowerCase());
+
+                                   if (
+                                        nombre.includes(anhoCursadoUsuario) ||
+                                        abreviatura.includes(
+                                             anhoCursadoUsuario
+                                        ) ||
+                                        otros.some((n) =>
+                                             n.includes(anhoCursadoUsuario)
+                                        )
+                                   ) {
+                                        anhoCursadoCoincidente = anhoCursado;
+                                        break;
+                                   }
+                              }
+
+                              if (anhoCursadoCoincidente) {
+                                   this.sobreEscribirContexto(outputContexts, {
+                                        name: `${req.body.session}/contexts/anhoCursadoAlumno`,
+                                        lifespanCount: 40,
+                                        parameters: {
+                                             anhoCursadoAlumno:
+                                                  anhoCursadoCoincidente.denominacion,
+                                        },
+                                   });
+                                   this.sobreEscribirContexto(outputContexts, {
+                                        name: `${req.body.session}/contexts/idAnhoCursadoAlumno`,
+                                        lifespanCount: 40,
+                                        parameters: {
+                                             idAnhoCursadoAlumno:
+                                                  turnoCoincidente.id_anho_carrera,
+                                        },
+                                   });
                               }
 
                               break;
@@ -232,6 +436,63 @@ export class AtencionClienteController {
                               'No se encontró información del negocio.',
                     });
                }
+
+               // Función auxiliar para obtener un parámetro de contexto fácilmente
+               const getParametroContexto = (nombreParametro) => {
+                    for (const ctx of outputContexts) {
+                         if (
+                              ctx.parameters &&
+                              ctx.parameters[nombreParametro] !== undefined
+                         ) {
+                              return ctx.parameters[nombreParametro];
+                         }
+                    }
+                    return null;
+               };
+
+               // Buscar los tres valores
+               const idCarreraAlumno = getParametroContexto('idCarreraAlumno');
+               const idTurnoAlumno = getParametroContexto('idTurnoAlumno');
+               const idAnhoCursadoAlumno = getParametroContexto(
+                    'idAnhoCursadoAlumno'
+               );
+
+               // Verificar si existen y ejecutar una acción
+               if (idCarreraAlumno && idTurnoAlumno && idAnhoCursadoAlumno) {
+                    const cursoConsultado = await CursoSchema.findAll({
+                         where: {
+                              id_negocio,
+                              id_anho: idAnhoCursadoAlumno,
+                              id_carrera: idCarreraAlumno,
+                              id_turno: idTurnoAlumno,
+                         },
+                         raw: true,
+                    });
+                    if (cursoConsultado) {
+                         this.sobreEscribirContexto(outputContexts, {
+                              name: `${req.body.session}/contexts/cursoAlumno`,
+                              lifespanCount: 40,
+                              parameters: {
+                                   cursoAlumno: cursoConsultado.nombre_curso,
+                              },
+                         });
+                         this.sobreEscribirContexto(outputContexts, {
+                              name: `${req.body.session}/contexts/cuotaCurso`,
+                              lifespanCount: 40,
+                              parameters: {
+                                   cuotaCurso: cursoConsultado.mensualidad,
+                              },
+                         });
+                         this.sobreEscribirContexto(outputContexts, {
+                              name: `${req.body.session}/contexts/matriculaCurso`,
+                              lifespanCount: 40,
+                              parameters: {
+                                   cuotaCurso: cursoConsultado.matricula,
+                              },
+                         });
+                    }
+               }
+
                /**
                 * Si mi intencion no es la generica buscara la respuesta en base a este, sino, lo buscara por pregunta ya que es un intento personalizado
                 */
@@ -305,12 +566,22 @@ export class AtencionClienteController {
                                         break;
 
                                    case 'valor_parametro':
-                                        // Si el usuario pasó el parámetro en esta consulta, lo usamos
-                                        // Ej: { cedulaCliente: "123456" }
+                                        // 1️⃣ Intentamos obtener del parámetro actual
                                         valor =
                                              parametros?.[
                                                   v.nombre_variable_pregunta
-                                             ] ?? null;
+                                             ];
+
+                                        // 2️⃣ Si no vino en esta consulta, buscamos en los contextos
+                                        if (valor == null) {
+                                             valor =
+                                                  this.getValorDesdeContextos(
+                                                       req.body.queryResult
+                                                            .outputContexts ||
+                                                            [],
+                                                       v.nombre_variable_pregunta
+                                                  );
+                                        }
                                         break;
 
                                    case 'valor_fijo':
@@ -331,25 +602,6 @@ export class AtencionClienteController {
 
                     const datosNegocio = {};
 
-                    // 2) Agregar variables de los contextos activos
-                    const inputContexts =
-                         req.body.queryResult.outputContexts || [];
-                    for (const ctx of inputContexts) {
-                         if (ctx.parameters) {
-                              for (const [key, value] of Object.entries(
-                                   ctx.parameters
-                              )) {
-                                   if (
-                                        value !== null &&
-                                        value !== undefined &&
-                                        value !== ''
-                                   ) {
-                                        datosNegocio[key] = value;
-                                   }
-                              }
-                         }
-                    }
-
                     for (const ctx of outputContexts) {
                          if (ctx.parameters) {
                               for (const [key, value] of Object.entries(
@@ -365,7 +617,6 @@ export class AtencionClienteController {
                               }
                          }
                     }
-
                     respuesta = this.renderTemplate(
                          pregunta.respuesta,
                          datosNegocio
@@ -599,6 +850,29 @@ export class AtencionClienteController {
                     `### Ocurrio un error al registrar el mensaje, info error : ${error} ;;;; informacion del mensaje : ${infoMensaje} ;;;;`
                );
           }
+     }
+
+     sobreEscribirContexto(outputContexts, nuevoValor) {
+          const index = outputContexts.findIndex(
+               (ctx) => ctx.name === nuevoValor.name
+          );
+          if (index !== -1) {
+               outputContexts[index] = nuevoValor; // 🔁 Sobrescribe el existente
+          } else {
+               outputContexts.push(nuevoValor); // ➕ Agrega si no existe
+          }
+     }
+
+     getValorDesdeContextos(outputContexts, nombreVariable) {
+          for (const ctx of outputContexts) {
+               if (
+                    ctx.parameters &&
+                    ctx.parameters[nombreVariable] !== undefined
+               ) {
+                    return ctx.parameters[nombreVariable];
+               }
+          }
+          return null;
      }
 }
 export const atencionClienteController = new AtencionClienteController();

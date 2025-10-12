@@ -1,5 +1,6 @@
 import { Op, where } from 'sequelize';
 import { NegocioSchema } from '../models/negocios.js';
+import bcrypt from 'bcrypt';
 
 export class UsuarioController {
      constructor(usuarioModel, usuarioSchema) {
@@ -41,6 +42,14 @@ export class UsuarioController {
                );
                nuevoUsuario['nombre_negocio'] =
                     negocioVinculado.dataValues.nombre_negocio;
+
+               // 🔒 Hashear la contraseña antes de guardar
+               const saltRounds = 10;
+               nuevoUsuario.contrasena = await bcrypt.hash(
+                    nuevoUsuario.contrasena,
+                    saltRounds
+               );
+
                const respuestaBD = await this.usuarioSchema.create(
                     nuevoUsuario
                );
@@ -79,6 +88,7 @@ export class UsuarioController {
                // Armar la consulta con ordenamiento si aplica
                const opcionesConsulta = {
                     where: { [Op.and]: condiciones },
+                    attributes: { exclude: ['contrasena'] }, // 👈 EXCLUYE la contraseña
                };
                if (campoOrden && tipoOrden) {
                     opcionesConsulta.order = [[campoOrden, tipoOrden]];
@@ -111,6 +121,19 @@ export class UsuarioController {
      update = async (req, res) => {
           const usuario = await this.getUsuario(req.body);
           const filtros = await this.limpiarCampos(req.body);
+          const saltRounds = 10;
+          console.log(filtros);
+          if (
+               filtros.contrasena &&
+               usuario.contrasena !==
+                    (await bcrypt.hash(filtros?.contrasena, saltRounds))
+          ) {
+               filtros.contrasena = await bcrypt.hash(
+                    filtros.contrasena,
+                    saltRounds
+               );
+          }
+
           delete filtros.id_usuario;
           const resultado = await this.usuarioSchema.update(filtros, {
                where: {
@@ -120,18 +143,22 @@ export class UsuarioController {
           });
           return res.json({ type: 'success', message: 'Usuario modificado' });
      };
-
      login = async (req, res) => {
           const filtros = req.body;
           const usuario = await this.usuarioSchema.findOne({
                where: { apodo: filtros.apodo },
           });
           if (usuario) {
-               if (usuario.contrasena === filtros.contrasena) {
+               const contrasenaValida = await bcrypt.compare(
+                    filtros.contrasena,
+                    usuario.contrasena
+               );
+
+               if (contrasenaValida) {
                     usuario.contrasena = null;
                     return res.status(200).json(usuario);
                }
-               if (usuario.contrasena !== filtros.contrasena) {
+               if (!contrasenaValida) {
                     return res.status(200).json({
                          type: 'error',
                          message: `Contraseña incorrecta, intentelo de nuevo`,

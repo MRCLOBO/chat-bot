@@ -21,15 +21,7 @@ export const AlumnoSchema = sequelize.define(
                type: DataTypes.STRING,
                allowNull: false,
           },
-          carrera: {
-               type: DataTypes.STRING,
-               allowNull: false,
-          },
-          turno: {
-               type: DataTypes.STRING,
-               allowNull: false,
-          },
-          anho: {
+          id_curso: {
                type: DataTypes.INTEGER,
                allowNull: false,
           },
