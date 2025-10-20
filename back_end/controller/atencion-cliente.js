@@ -57,35 +57,158 @@ export class AtencionClienteController {
 
           // 👉 Solo si es el primer mensaje: crear entidades
           if (esInicioConversacion) {
-               const productos = await ProductoSchema.findAll({
-                    attributes: ['nombre_producto', 'precio'],
+               // const productos = await ProductoSchema.findAll({
+               //      attributes: ['nombre_producto', 'precio'],
+               //      where: { id_negocio: infoAsistente.id_negocio },
+               // });
+
+               // const categorias = await CategoriaSchema.findAll({
+               //      attributes: ['nombre_categoria'],
+               //      where: { id_negocio: infoAsistente.id_negocio },
+               // });
+
+               // const nombres = [
+               //      ...new Set(productos.map((p) => p.nombre_producto)),
+               // ];
+               // const precios = [
+               //      ...new Set(productos.map((p) => p.precio.toString())),
+               // ];
+               // const categoriasVariables = [
+               //      ...new Set(categorias.map((c) => c.nombre_categoria)),
+               // ];
+
+               // await this.crearSessionEntities(
+               //      sessionId,
+               //      [
+               //           { entityName: 'productoNombre', values: nombres },
+               //           {
+               //                entityName: 'productoCategoria',
+               //                values: categoriasVariables,
+               //           },
+               //           { entityName: 'productoPrecio', values: precios },
+               //      ],
+               //      configAgente
+               // );
+               const documentos = await AlumnoSchema.findAll({
+                    attributes: ['ci'],
                     where: { id_negocio: infoAsistente.id_negocio },
                });
 
-               const categorias = await CategoriaSchema.findAll({
-                    attributes: ['nombre_categoria'],
+               const consultaCursos = await CursoSchema.findAll({
+                    attributes: ['nombre_curso'],
                     where: { id_negocio: infoAsistente.id_negocio },
                });
 
-               const nombres = [
-                    ...new Set(productos.map((p) => p.nombre_producto)),
+               const consultaAnhos = await AnhoCarreraSchema.findAll({
+                    attributes: ['denominacion', 'otra_denominacion'],
+                    where: { id_negocio: infoAsistente.id_negocio },
+               });
+
+               const consultaTurnos = await TurnoCarreraSchema.findAll({
+                    attributes: ['denominacion', 'otra_denominacion'],
+                    where: { id_negocio: infoAsistente.id_negocio },
+               });
+
+               const consultaCarreras = await CarreraSchema.findAll({
+                    attributes: ['nombre_carrera', 'otro_nombre'],
+                    where: { id_negocio: infoAsistente.id_negocio },
+               });
+               const nroDocumentos = [
+                    ...new Set(documentos.map((d) => d.ci.toString())),
                ];
-               const precios = [
-                    ...new Set(productos.map((p) => p.precio.toString())),
+               const cursos = [
+                    ...new Set(consultaCursos.map((c) => c.nombre_curso)),
                ];
-               const categoriasVariables = [
-                    ...new Set(categorias.map((c) => c.nombre_categoria)),
-               ];
+
+               // Convertir el resultado en entidades con sinónimos
+               const anhosCursadoEntities = consultaAnhos
+                    .map((a) => {
+                         // Evitar registros vacíos o nulos
+                         if (!a.denominacion) return null;
+
+                         // Construir el objeto con sinónimos
+                         const synonyms = [a.denominacion];
+
+                         if (
+                              a.otra_denominacion &&
+                              a.otra_denominacion.trim() !== ''
+                         ) {
+                              synonyms.push(a.otra_denominacion.trim());
+                         }
+
+                         return {
+                              value: a.denominacion.trim(),
+                              synonyms,
+                         };
+                    })
+                    .filter(Boolean); // Elimina nulos
+
+               // Convertir el resultado en entidades con sinónimos
+               const carreraEntities = consultaCarreras
+                    .map((c) => {
+                         // Evitar registros vacíos o nulos
+                         if (!c.nombre_carrera) return null;
+
+                         // Construir el objeto con sinónimos
+                         const synonyms = [c.nombre_carrera];
+
+                         if (c.otro_nombre && c.otro_nombre.trim() !== '') {
+                              synonyms.push(c.otro_nombre.trim());
+                         }
+
+                         return {
+                              value: c.nombre_carrera.trim(),
+                              synonyms,
+                         };
+                    })
+                    .filter(Boolean); // Elimina nulos
+
+               // Convertir el resultado en entidades con sinónimos
+               const turnoCarreraEntities = consultaTurnos
+                    .map((t) => {
+                         // Evitar registros vacíos o nulos
+                         if (!t.denominacion) return null;
+
+                         // Construir el objeto con sinónimos
+                         const synonyms = [t.denominacion];
+
+                         if (
+                              t.otra_denominacion &&
+                              t.otra_denominacion.trim() !== ''
+                         ) {
+                              synonyms.push(t.otra_denominacion.trim());
+                         }
+
+                         return {
+                              value: t.denominacion.trim(),
+                              synonyms,
+                         };
+                    })
+                    .filter(Boolean); // Elimina nulos
 
                await this.crearSessionEntities(
                     sessionId,
                     [
-                         { entityName: 'productoNombre', values: nombres },
                          {
-                              entityName: 'productoCategoria',
-                              values: categoriasVariables,
+                              entityName: 'documentoAlumno',
+                              values: nroDocumentos,
                          },
-                         { entityName: 'productoPrecio', values: precios },
+                         {
+                              entityName: 'cursoAlumno',
+                              values: cursos,
+                         },
+                         {
+                              entityName: 'anhoCursadoAlumno',
+                              values: anhosCursadoEntities,
+                         },
+                         {
+                              entityName: 'turnoAlumno',
+                              values: turnoCarreraEntities,
+                         },
+                         {
+                              entityName: 'carreraAlumno',
+                              values: carreraEntities,
+                         },
                     ],
                     configAgente
                );
