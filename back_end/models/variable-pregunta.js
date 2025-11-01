@@ -39,6 +39,7 @@ export const VariablePreguntaSchema = sequelize.define(
         variable_principal: {
             type: DataTypes.BOOLEAN,
             allowNull: false,
+            defaultVallue: false,
         },
     },
     {
