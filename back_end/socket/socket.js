@@ -4,21 +4,30 @@ export default function registerSockets(io, { controller }) {
           console.log('Cliente conectado:', socket.id);
 
           // 🔹 Unirse a una sala por sessionID
-          socket.on('chat:join', ({ sessionID }) => {
+          socket.on('chat:join', async ({ sessionID, esAsistente = false }) => {
                if (!sessionID) return;
-               let estado = 'En curso';
                socket.join(sessionID);
                console.log(
                     `Cliente ${socket.id} se unió a la sala ${sessionID}`
                );
                socket.emit('chat:joined', { ok: true, sessionID });
+               if (esAsistente) {
+                    await controller.actualizarEstadoAsistente(
+                         sessionID,
+                         'Asistido'
+                    );
+               }
           });
 
-          socket.on('chat:leave', ({ sessionID }) => {
+          socket.on('chat:leave', async ({ sessionID }) => {
                if (!sessionID) return;
                socket.leave(sessionID);
                console.log(
                     `Usuario ${socket.id} salió de la sala ${sessionID}`
+               );
+               await controller.actualizarEstadoAsistente(
+                    sessionID,
+                    'Finalizado'
                );
           });
 
@@ -78,9 +87,13 @@ export default function registerSockets(io, { controller }) {
                     }
                }
           });
-          socket.on('chat:usarIA', ({ sessionID }) => {
+          socket.on('chat:usarIA', async ({ sessionID }) => {
                // Avisar a todos los clientes de la sala que hay un admin activo
                io.to(sessionID).emit('chat:usarIA', { activo: true });
+               await controller.actualizarEstadoAsistente(
+                    sessionID,
+                    'En curso'
+               );
           });
 
           socket.on('chat:dejarIA', ({ sessionID }) => {
