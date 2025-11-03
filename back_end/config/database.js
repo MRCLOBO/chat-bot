@@ -5,17 +5,17 @@ const dotenv = require("dotenv").config();
 
 export const sequelize = new Sequelize(
     // LOCAL
-    process.env.DATABASE,
-    process.env.DB_USER,
-    process.env.DB_PASSWORD,
-    { host: process.env.HOST, dialect: "postgres" }
+    // process.env.DATABASE,
+    // process.env.DB_USER,
+    // process.env.DB_PASSWORD,
+    // { host: process.env.HOST, dialect: "postgres" }
 
     // PRODUCCION
-    // process.env.DATABASE_URL_PROD,
-    // {
-    //     dialect: "postgres",
-    //     dialectOptions: { ssl: true },
-    // } // Neon requiere SSL
+    process.env.DATABASE_URL_PROD,
+    {
+        dialect: "postgres",
+        dialectOptions: { ssl: true },
+    } // Neon requiere SSL
 );
 
 export async function conectarBD() {
