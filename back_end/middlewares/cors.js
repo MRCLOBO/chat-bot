@@ -3,8 +3,8 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const dotenv = require("dotenv").config();
 
-const apiUrls = process.env.API_URLS.split(",");
-const ACCEPTED_ORIGINS = apiUrls;
+// const apiUrls = process.env.API_URLS.split(",");
+// const ACCEPTED_ORIGINS = apiUrls;
 
 export const corsMiddleware = ({ acceptedOrigins = ACCEPTED_ORIGINS } = {}) =>
     cors({
