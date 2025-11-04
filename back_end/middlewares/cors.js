@@ -6,7 +6,7 @@ const dotenv = require("dotenv").config();
 // const apiUrls = process.env.API_URLS.split(",");
 // const ACCEPTED_ORIGINS = apiUrls;
 
-export const corsMiddleware = ({ acceptedOrigins = ACCEPTED_ORIGINS } = {}) =>
+export const corsMiddleware = () =>
     cors({
         // origin: (origin, callback) => {
         //      if (acceptedOrigins.includes(origin)) {
