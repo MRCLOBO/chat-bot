@@ -1,8 +1,8 @@
 import { Server } from "socket.io";
 let ioInstance = null;
 
-const apiUrls = process.env.API_URLS.split(",");
-const ACCEPTED_ORIGINS = apiUrls;
+// const apiUrls = process.env.API_URLS.split(",");
+// const ACCEPTED_ORIGINS = apiUrls;
 
 export const initIO = (server) => {
     if (!ioInstance) {
