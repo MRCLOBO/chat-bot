@@ -140,10 +140,14 @@ app.use((req, res, next) => {
 });
 
 // para que se pueda acceder a la carpeta imagenes a traves de la URL
-app.use(
-    "/imagenes",
-    express.static(path.join(process.env.URLBASE, "imagenes"))
-);
+const __dirname = path.dirname(__filename);
+
+// app.use(
+//     "/imagenes",
+//     express.static(path.join(process.env.URLBASE, "imagenes"))
+// );
+
+app.use("/imagenes", express.static(path.join(__dirname, "imagenes")));
 
 //basicamente en esta parte redirigimos todas las consultas de cualquier metodo a "/usuarios" al archivo usuariosRouter que ya maneja todas las solicitudes
 app.use("/usuarios", createUsuariosrouter(UsuarioModel, UsuarioSchema));
