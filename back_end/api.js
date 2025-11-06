@@ -69,6 +69,8 @@ import { MateriaModel, MateriaSchema } from "./models/materia.js";
 import { createMateriaRouter } from "./routes/materia.js";
 import { createNotaRouter } from "./routes/nota.js";
 import { NotaModel, NotaSchema } from "./models/nota.js";
+import { fileURLToPath } from "url";
+const __filename = fileURLToPath(import.meta.url);
 
 const PORT = process.env.API_PORT;
 const app = express();
