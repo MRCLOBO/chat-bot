@@ -1,5 +1,6 @@
 import { Op, where, fn, col } from 'sequelize';
 import { NegocioSchema } from '../models/negocios.js';
+import { sequelize } from '../config/database.js';
 
 export class TurnoCarreraController {
      constructor(turnoCarreraModel, turnoCarreraSchema) {
@@ -8,8 +9,14 @@ export class TurnoCarreraController {
           this.NegocioSchema = new NegocioSchema();
      }
 
+     setCurrentUser = async (usuario) => {
+          if (!usuario) return;
+          await sequelize.query(`SET "app.current_user" = '${usuario}'`);
+     };
      create = async (req, res) => {
           try {
+               const usuario = req.headers['x-apodo'] || 'desconocido';
+               this.setCurrentUser(usuario);
                const nuevo = req.body;
                nuevo['id_turno_carrera'] = await this.obtenerUltimoID();
 
@@ -77,6 +84,8 @@ export class TurnoCarreraController {
 
      delete = async (req, res) => {
           try {
+               const usuario = req.headers['x-apodo'] || 'desconocido';
+               this.setCurrentUser(usuario);
                const registro = await this.getRegistro(req.body);
                await registro.destroy();
                res.json({ mensaje: 'Eliminado correctamente' });
@@ -90,6 +99,8 @@ export class TurnoCarreraController {
      };
 
      update = async (req, res) => {
+          const usuario = req.headers['x-apodo'] || 'desconocido';
+          this.setCurrentUser(usuario);
           const registro = await this.getRegistro(req.body);
           const filtros = await this.limpiarCampos(req.body);
           const resultado = await this.schema.update(filtros, {

@@ -1,6 +1,7 @@
 import { Op, where } from 'sequelize';
 import { NegocioSchema } from '../models/negocios.js';
 import bcrypt from 'bcrypt';
+import { sequelize } from '../config/database.js';
 
 export class UsuarioController {
      constructor(usuarioModel, usuarioSchema) {
@@ -8,6 +9,11 @@ export class UsuarioController {
           this.usuarioSchema = usuarioSchema;
           this.NegocioSchema = new NegocioSchema();
      }
+
+     setCurrentUser = async (usuario) => {
+          if (!usuario) return;
+          await sequelize.query(`SET "app.current_user" = '${usuario}'`);
+     };
      getAll = async (req, res) => {
           const usuarios = await this.usuarioSchema.findAll();
           return res.status(200).json(usuarios);
@@ -29,6 +35,8 @@ export class UsuarioController {
 
      create = async (req, res) => {
           try {
+               const usuarioAuditoria = req.headers['x-apodo'] || 'desconocido';
+               this.setCurrentUser(usuarioAuditoria);
                const nuevoUsuario = req.body;
                nuevoUsuario['id_usuario'] = await this.obtenerUltimoID();
                if (await this.existeApodo(nuevoUsuario.apodo)) {
@@ -107,6 +115,8 @@ export class UsuarioController {
 
      delete = async (req, res) => {
           try {
+               const usuarioAuditoria = req.headers['x-apodo'] || 'desconocido';
+               this.setCurrentUser(usuarioAuditoria);
                const usuario = await this.getUsuario(req.body);
                await usuario.destroy();
                res.json({ mensaje: 'Usuario eliminado correctamente' });
@@ -119,6 +129,8 @@ export class UsuarioController {
      };
 
      update = async (req, res) => {
+          const usuarioAuditoria = req.headers['x-apodo'] || 'desconocido';
+          this.setCurrentUser(usuarioAuditoria);
           const usuario = await this.getUsuario(req.body);
           const filtros = await this.limpiarCampos(req.body);
           const saltRounds = 10;
@@ -153,6 +165,17 @@ export class UsuarioController {
                     filtros.contrasena,
                     usuario.contrasena
                );
+
+               if (usuario.apodo) {
+                    // Supongamos que tu usuario autenticado está en req.user.email
+                    await sequelize.query(
+                         `SET "app.current_user" = '${usuario.apodo}'`
+                    );
+               } else {
+                    await sequelize.query(
+                         `SET "app.current_user" = 'USUARIO SIN NOMBRE'`
+                    );
+               }
 
                if (contrasenaValida) {
                     usuario.contrasena = null;

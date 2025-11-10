@@ -1,5 +1,6 @@
 import { Op, where, fn, col } from 'sequelize';
 import { NegocioSchema } from '../models/negocios.js';
+import { sequelize } from '../config/database.js';
 
 export class AnhoCarreraController {
      constructor(anhoCarreraModel, anhoCarreraSchema) {
@@ -7,9 +8,15 @@ export class AnhoCarreraController {
           this.anhoCarreraSchema = anhoCarreraSchema;
           this.NegocioSchema = new NegocioSchema();
      }
+     setCurrentUser = async (usuario) => {
+          if (!usuario) return;
+          await sequelize.query(`SET "app.current_user" = '${usuario}'`);
+     };
 
      create = async (req, res) => {
           try {
+               const usuario = req.headers['x-apodo'] || 'desconocido';
+               this.setCurrentUser(usuario);
                const nuevoAnhoCarrera = req.body;
                nuevoAnhoCarrera['id_anho_carrera'] =
                     await this.obtenerUltimoID();
@@ -80,6 +87,8 @@ export class AnhoCarreraController {
 
      delete = async (req, res) => {
           try {
+               const usuario = req.headers['x-apodo'] || 'desconocido';
+               this.setCurrentUser(usuario);
                const anhoCarrera = await this.getAnhoCarrera(req.body);
                await anhoCarrera.destroy();
                res.json({ mensaje: 'Año eliminado correctamente' });
@@ -93,6 +102,8 @@ export class AnhoCarreraController {
      };
 
      update = async (req, res) => {
+          const usuario = req.headers['x-apodo'] || 'desconocido';
+          this.setCurrentUser(usuario);
           const anhoCarrera = await this.getAnhoCarrera(req.body);
           const filtros = await this.limpiarCampos(req.body);
           const resultado = await this.anhoCarreraSchema.update(filtros, {

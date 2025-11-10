@@ -1,150 +1,160 @@
-import { Op, where, fn, col } from "sequelize";
-import { NegocioSchema } from "../models/negocios.js";
-import { AlumnoSchema } from "../models/alumno.js";
+import { Op, where, fn, col } from 'sequelize';
+import { NegocioSchema } from '../models/negocios.js';
+import { AlumnoSchema } from '../models/alumno.js';
+import { sequelize } from '../config/database.js';
 
 export class NotaController {
-    constructor(notaModel, notaSchema) {
-        this.modelo = notaModel;
-        this.schema = notaSchema;
-        this.NegocioSchema = new NegocioSchema();
-    }
+     constructor(notaModel, notaSchema) {
+          this.modelo = notaModel;
+          this.schema = notaSchema;
+          this.NegocioSchema = new NegocioSchema();
+     }
+     setCurrentUser = async (usuario) => {
+          if (!usuario) return;
+          await sequelize.query(`SET "app.current_user" = '${usuario}'`);
+     };
+     create = async (req, res) => {
+          try {
+               const usuario = req.headers['x-apodo'] || 'desconocido';
+               this.setCurrentUser(usuario);
+               const nuevo = req.body;
+               nuevo['id_nota'] = await this.obtenerUltimoID();
 
-    create = async (req, res) => {
-        try {
-            const nuevo = req.body;
-            nuevo["id_nota"] = await this.obtenerUltimoID();
+               const respuestaBD = await this.schema.create(nuevo);
+               return res.status(200).json({
+                    type: 'success',
+                    message: 'Registrado con exito!',
+                    bd: respuestaBD,
+               });
+          } catch (error) {
+               res.status(500).json({
+                    type: 'error',
+                    message: `Error al crear el registro por el siguiente error: ${error}`,
+               });
+               console.error(error);
+          }
+     };
+     getBy = async (req, res) => {
+          try {
+               const filtros = await this.limpiarCampos(req.body);
+               const condiciones = [];
+               for (const key in filtros) {
+                    condiciones.push({ [key]: filtros[key] });
+               }
+               // Armar la consulta con ordenamiento si aplica
+               const opcionesConsulta = {
+                    where: { [Op.and]: condiciones },
+               };
+               const registros = await this.schema.findAll({
+                    ...opcionesConsulta,
+                    include: [
+                         {
+                              model: NegocioSchema,
+                              as: 'negocio',
+                              attributes: { exclude: ['api_key'] },
+                         },
+                         {
+                              model: AlumnoSchema,
+                              as: 'alumno',
+                         },
+                    ],
+               });
+               return res.status(200).json(registros);
+          } catch (error) {
+               res.status(500).json({
+                    type: 'error',
+                    message: `Error al consultar los datos registrados: ${error}`,
+               });
+          }
+     };
 
-            const respuestaBD = await this.schema.create(nuevo);
-            return res.status(200).json({
-                type: "success",
-                message: "Registrado con exito!",
-                bd: respuestaBD,
-            });
-        } catch (error) {
-            res.status(500).json({
-                type: "error",
-                message: `Error al crear el registro por el siguiente error: ${error}`,
-            });
-            console.error(error);
-        }
-    };
-    getBy = async (req, res) => {
-        try {
-            const filtros = await this.limpiarCampos(req.body);
-            const condiciones = [];
-            for (const key in filtros) {
-                condiciones.push({ [key]: filtros[key] });
-            }
-            // Armar la consulta con ordenamiento si aplica
-            const opcionesConsulta = {
-                where: { [Op.and]: condiciones },
-            };
-            const registros = await this.schema.findAll({
-                ...opcionesConsulta,
-                include: [
-                    {
-                        model: NegocioSchema,
-                        as: "negocio",
-                        attributes: { exclude: ["api_key"] },
+     delete = async (req, res) => {
+          try {
+               const usuario = req.headers['x-apodo'] || 'desconocido';
+               this.setCurrentUser(usuario);
+               const registro = await this.getRegistro(req.body);
+               await registro.destroy();
+               res.json({ mensaje: 'Eliminado correctamente' });
+          } catch (error) {
+               console.error(error);
+               res.status(500).json({
+                    type: 'error',
+                    message: `Error al eliminar el registro por el siguiente error: ${error}`,
+               });
+          }
+     };
+
+     update = async (req, res) => {
+          const usuario = req.headers['x-apodo'] || 'desconocido';
+          this.setCurrentUser(usuario);
+          const registro = await this.getRegistro(req.body);
+          const filtros = await this.limpiarCampos(req.body);
+          const resultado = await this.schema.update(filtros, {
+               where: {
+                    id_nota: registro.id_nota,
+               },
+          });
+          return res.json({ type: 'success', message: 'Registro Modificado' });
+     };
+
+     async limpiarCampos(filtros) {
+          //Se elimina todo aquel campo que tenga como valor "null"
+          const filtrosLimpios = Object.fromEntries(
+               Object.entries(filtros).filter(([_, value]) => value !== null)
+          );
+          return filtrosLimpios;
+     }
+
+     async getRegistro(filtros) {
+          try {
+               // Se busca el registro por su id y id_negocio por la primary key compuesta
+               const registro = await this.schema.findOne({
+                    where: {
+                         id_nota: filtros.id_nota,
                     },
-                    {
-                        model: AlumnoSchema,
-                        as: "alumno",
-                    },
-                ],
-            });
-            return res.status(200).json(registros);
-        } catch (error) {
-            res.status(500).json({
-                type: "error",
-                message: `Error al consultar los datos registrados: ${error}`,
-            });
-        }
-    };
-
-    delete = async (req, res) => {
-        try {
-            const registro = await this.getRegistro(req.body);
-            await registro.destroy();
-            res.json({ mensaje: "Eliminado correctamente" });
-        } catch (error) {
-            console.error(error);
-            res.status(500).json({
-                type: "error",
-                message: `Error al eliminar el registro por el siguiente error: ${error}`,
-            });
-        }
-    };
-
-    update = async (req, res) => {
-        const registro = await this.getRegistro(req.body);
-        const filtros = await this.limpiarCampos(req.body);
-        const resultado = await this.schema.update(filtros, {
-            where: {
-                id_nota: registro.id_nota,
-            },
-        });
-        return res.json({ type: "success", message: "Registro Modificado" });
-    };
-
-    async limpiarCampos(filtros) {
-        //Se elimina todo aquel campo que tenga como valor "null"
-        const filtrosLimpios = Object.fromEntries(
-            Object.entries(filtros).filter(([_, value]) => value !== null)
-        );
-        return filtrosLimpios;
-    }
-
-    async getRegistro(filtros) {
-        try {
-            // Se busca el registro por su id y id_negocio por la primary key compuesta
-            const registro = await this.schema.findOne({
-                where: {
-                    id_nota: filtros.id_nota,
-                },
-            });
-            if (!registro)
-                return {
-                    type: "error",
-                    message: "Registro encontrado",
-                };
-            return registro;
-        } catch (error) {
-            return res.status(200).json({
-                type: "error",
-                message: `Registro no encontrado`,
-            });
-        }
-    }
-    async obtenerUltimoID() {
-        try {
-            const ultimoRegistro = await this.schema.findOne({
-                order: [["id_nota", "DESC"]],
-            });
-            if (ultimoRegistro) {
-                return ultimoRegistro.id_nota + 1;
-            } else {
-                return 1;
-            }
-        } catch (error) {
-            return {
-                type: "error",
-                message: "Error al recuperar el ultimo ID de la tabla",
-            };
-        }
-    }
-    async getNegocio(idNegocio) {
-        try {
-            const negocio = await NegocioSchema.findByPk(idNegocio);
-            if (!negocio)
-                return { type: "error", message: "Negocio no encontrado" };
-            return negocio;
-        } catch (error) {
-            return {
-                type: "error",
-                message: "Error al recuperar la informacion del negocio",
-                error: error,
-            };
-        }
-    }
+               });
+               if (!registro)
+                    return {
+                         type: 'error',
+                         message: 'Registro encontrado',
+                    };
+               return registro;
+          } catch (error) {
+               return res.status(200).json({
+                    type: 'error',
+                    message: `Registro no encontrado`,
+               });
+          }
+     }
+     async obtenerUltimoID() {
+          try {
+               const ultimoRegistro = await this.schema.findOne({
+                    order: [['id_nota', 'DESC']],
+               });
+               if (ultimoRegistro) {
+                    return ultimoRegistro.id_nota + 1;
+               } else {
+                    return 1;
+               }
+          } catch (error) {
+               return {
+                    type: 'error',
+                    message: 'Error al recuperar el ultimo ID de la tabla',
+               };
+          }
+     }
+     async getNegocio(idNegocio) {
+          try {
+               const negocio = await NegocioSchema.findByPk(idNegocio);
+               if (!negocio)
+                    return { type: 'error', message: 'Negocio no encontrado' };
+               return negocio;
+          } catch (error) {
+               return {
+                    type: 'error',
+                    message: 'Error al recuperar la informacion del negocio',
+                    error: error,
+               };
+          }
+     }
 }

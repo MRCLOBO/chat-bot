@@ -1,5 +1,6 @@
 import { Op, where, fn, col } from 'sequelize';
 import { NegocioSchema } from '../models/negocios.js';
+import { sequelize } from '../config/database.js';
 
 export class AsistenteController {
      constructor(asistenteModel, asistenteSchema) {
@@ -7,6 +8,10 @@ export class AsistenteController {
           this.asistenteSchema = asistenteSchema;
           this.NegocioSchema = new NegocioSchema();
      }
+     setCurrentUser = async (usuario) => {
+          if (!usuario) return;
+          await sequelize.query(`SET "app.current_user" = '${usuario}'`);
+     };
 
      getAll = async (req, res) => {
           const asistente = await this.asistenteSchema.findAll();
@@ -15,6 +20,8 @@ export class AsistenteController {
 
      create = async (req, res) => {
           try {
+               const usuario = req.headers['x-apodo'] || 'desconocido';
+               this.setCurrentUser(usuario);
                const nuevoAsistente = req.body;
                nuevoAsistente['id_asistente'] = await this.obtenerUltimoID();
                const negocioVinculado = await this.getNegocio(
@@ -88,6 +95,8 @@ export class AsistenteController {
 
      delete = async (req, res) => {
           try {
+               const usuario = req.headers['x-apodo'] || 'desconocido';
+               this.setCurrentUser(usuario);
                const asistente = await this.getAsistente(req.body);
                await asistente.destroy();
                res.json({ mensaje: 'Asistente eliminado correctamente' });
@@ -101,6 +110,8 @@ export class AsistenteController {
      };
 
      update = async (req, res) => {
+          const usuario = req.headers['x-apodo'] || 'desconocido';
+          this.setCurrentUser(usuario);
           const asistente = await this.getAsistente(req.body);
           const filtros = await this.limpiarCampos(req.body);
           delete filtros.id_asistente;

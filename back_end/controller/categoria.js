@@ -1,6 +1,7 @@
 import { Op, where, fn, col } from 'sequelize';
 import { NegocioSchema } from '../models/negocios.js';
 import { ProductoSchema } from '../models/producto.js';
+import { sequelize } from '../config/database.js';
 
 export class CategoriaController {
      constructor(categoriaModel, categoriaSchema) {
@@ -8,6 +9,11 @@ export class CategoriaController {
           this.categoriaSchema = categoriaSchema;
           this.NegocioSchema = new NegocioSchema();
      }
+     setCurrentUser = async (usuario) => {
+          if (!usuario) return;
+          await sequelize.query(`SET "app.current_user" = '${usuario}'`);
+     };
+
      getAll = async (req, res) => {
           const categoria = await this.categoriaSchema.findAll();
           return res.status(200).json(categoria);
@@ -15,6 +21,8 @@ export class CategoriaController {
 
      create = async (req, res) => {
           try {
+               const usuario = req.headers['x-apodo'] || 'desconocido';
+               this.setCurrentUser(usuario);
                const nuevaCategoria = req.body;
                nuevaCategoria['id_categoria'] = await this.obtenerUltimoID(
                     nuevaCategoria.id_negocio
@@ -125,6 +133,8 @@ export class CategoriaController {
 
      delete = async (req, res) => {
           try {
+               const usuario = req.headers['x-apodo'] || 'desconocido';
+               this.setCurrentUser(usuario);
                const categoria = await this.getCategoria(req.body);
                await categoria.destroy();
                res.json({ mensaje: 'Categoria eliminada correctamente' });
@@ -137,6 +147,8 @@ export class CategoriaController {
      };
 
      update = async (req, res) => {
+          const usuario = req.headers['x-apodo'] || 'desconocido';
+          this.setCurrentUser(usuario);
           const categoria = await this.getCategoria(req.body);
           const filtros = await this.limpiarCampos(req.body);
           delete filtros.id_categoria;

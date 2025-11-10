@@ -2,15 +2,22 @@ import { Op, where } from 'sequelize';
 import { HorarioSchema } from '../models/horario.js';
 import { CategoriaController } from './categoria.js';
 import { CategoriaModel, CategoriaSchema } from '../models/categoria.js';
+import { sequelize } from '../config/database.js';
 
 export class NegocioController {
      constructor(negocioModel, negocioSchema) {
           this.negocioModel = negocioModel;
           this.negocioSchema = negocioSchema;
      }
+     setCurrentUser = async (usuario) => {
+          if (!usuario) return;
+          await sequelize.query(`SET "app.current_user" = '${usuario}'`);
+     };
 
      create = async (req, res) => {
           try {
+               const usuario = req.headers['x-apodo'] || 'desconocido';
+               this.setCurrentUser(usuario);
                const nuevoNegocio = req.body;
                const idNegocio = await this.obtenerUltimoID();
                nuevoNegocio.id_negocio = idNegocio;
@@ -63,6 +70,8 @@ export class NegocioController {
 
      delete = async (req, res) => {
           try {
+               const usuario = req.headers['x-apodo'] || 'desconocido';
+               this.setCurrentUser(usuario);
                const negocio = await this.getNegocio(req.body);
                await HorarioSchema.destroy({
                     where: {
@@ -80,6 +89,8 @@ export class NegocioController {
      };
 
      update = async (req, res) => {
+          const usuario = req.headers['x-apodo'] || 'desconocido';
+          this.setCurrentUser(usuario);
           const negocio = await this.getNegocio(req.body);
           const filtros = await this.limpiarCampos(req.body);
           delete filtros.id_negocio;

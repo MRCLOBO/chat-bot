@@ -1,5 +1,6 @@
 import { Op, where, fn, col } from 'sequelize';
 import { NegocioSchema } from '../models/negocios.js';
+import { sequelize } from '../config/database.js';
 
 export class AlumnoController {
      constructor(alumnoModel, alumnoSchema) {
@@ -7,9 +8,16 @@ export class AlumnoController {
           this.alumnoSchema = alumnoSchema;
           this.NegocioSchema = new NegocioSchema();
      }
+     setCurrentUser = async (usuario) => {
+          if (!usuario) return;
+          await sequelize.query(`SET "app.current_user" = '${usuario}'`);
+     };
 
      create = async (req, res) => {
           try {
+               const usuario = req.headers['x-apodo'] || 'desconocido';
+               this.setCurrentUser(usuario);
+
                const nuevoAlumno = req.body;
                nuevoAlumno['id_alumno'] = await this.obtenerUltimoID();
                const negocioVinculado = await this.getNegocio(
@@ -81,6 +89,8 @@ export class AlumnoController {
 
      delete = async (req, res) => {
           try {
+               const usuario = req.headers['x-apodo'] || 'desconocido';
+               this.setCurrentUser(usuario);
                const alumno = await this.getAlumno(req.body);
                await alumno.destroy();
                res.json({ mensaje: 'Alumno eliminado correctamente' });
@@ -94,6 +104,8 @@ export class AlumnoController {
      };
 
      update = async (req, res) => {
+          const usuario = req.headers['x-apodo'] || 'desconocido';
+          this.setCurrentUser(usuario);
           const alumno = await this.getAlumno(req.body);
           const filtros = await this.limpiarCampos(req.body);
           const resultado = await this.alumnoSchema.update(filtros, {

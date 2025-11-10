@@ -3,6 +3,7 @@ import { NegocioSchema } from '../models/negocios.js';
 import { AsistenteSchema } from '../models/asistente.js';
 import { RespuestaAsistenteSchema } from '../models/respuesta-asistente.js';
 import { createRequire } from 'module';
+import { sequelize } from '../config/database.js';
 const require = createRequire(import.meta.url);
 const { EntityTypesClient } = require('@google-cloud/dialogflow');
 
@@ -12,6 +13,11 @@ export class VariablePreguntaController {
           this.variablePreguntaSchema = variablePreguntaSchema;
      }
 
+     setCurrentUser = async (usuario) => {
+          if (!usuario) return;
+          await sequelize.query(`SET "app.current_user" = '${usuario}'`);
+     };
+
      getAll = async (req, res) => {
           const variablePregunta = await this.variablePreguntaSchema.findAll();
           return res.status(200).json(variablePregunta);
@@ -19,6 +25,8 @@ export class VariablePreguntaController {
 
      create = async (req, res) => {
           try {
+               const usuarioAuditoria = req.headers['x-apodo'] || 'desconocido';
+               this.setCurrentUser(usuarioAuditoria);
                const nuevaVariablePregunta = req.body;
                nuevaVariablePregunta['id_variable_pregunta'] =
                     await this.obtenerUltimoID();
@@ -107,6 +115,8 @@ export class VariablePreguntaController {
 
      delete = async (req, res) => {
           try {
+               const usuarioAuditoria = req.headers['x-apodo'] || 'desconocido';
+               this.setCurrentUser(usuarioAuditoria);
                const variablePregunta = await this.getVariablePregunta(
                     req.body
                );
@@ -175,6 +185,8 @@ export class VariablePreguntaController {
 
      update = async (req, res) => {
           try {
+               const usuarioAuditoria = req.headers['x-apodo'] || 'desconocido';
+               this.setCurrentUser(usuarioAuditoria);
                const variablePregunta = await this.getVariablePregunta(
                     req.body
                );
